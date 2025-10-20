@@ -82,13 +82,6 @@ NEXT_PUBLIC_API_BASE=/api
 
 For detailed architecture information, API specifications, and implementation details, see [docs/Architecture.md](docs/Architecture.md).
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
 ## License
 
 This project is part of a university course (POOSD - Principles of Object-Oriented Software Design).
