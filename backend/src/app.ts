@@ -2,6 +2,20 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
+import dotenv from "dotenv";
+
+// Import middleware
+import { requestId } from "./middleware/requestId";
+import { errorHandler } from "./middleware/errorHandler";
+import { ipRateLimit } from "./middleware/rateLimiter";
+
+// Import routes
+import authRoutes from "./routes/auth";
+import userRoutes from "./routes/users";
+import briefingRoutes from "./routes/briefings";
+
+// Load environment variables
+dotenv.config();
 
 const app = express();
 
@@ -14,6 +28,9 @@ app.use(
   })
 );
 
+// Request ID middleware
+app.use(requestId);
+
 // Logging
 app.use(morgan("combined"));
 
@@ -21,32 +38,30 @@ app.use(morgan("combined"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Global rate limiting
+app.use(ipRateLimit);
+
 // Health check
 app.get("/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// API routes will be added here
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/briefings', briefingRoutes);
+// API routes
+app.use("/api/auth", authRoutes);
+app.use("/api/me", userRoutes);
+app.use("/api/briefings", briefingRoutes);
 
 // 404 handler
 app.use("*", (req, res) => {
-  res.status(404).json({ error: "Route not found" });
+  res.status(404).json({
+    error: {
+      code: "NOT_FOUND",
+      message: "Route not found",
+    },
+  });
 });
 
 // Error handler
-app.use(
-  (
-    err: any,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => {
-    console.error(err.stack);
-    res.status(500).json({ error: "Something went wrong!" });
-  }
-);
+app.use(errorHandler);
 
 export default app;

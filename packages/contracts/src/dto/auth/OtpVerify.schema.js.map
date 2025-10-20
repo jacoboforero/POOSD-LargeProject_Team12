@@ -1,0 +1,1 @@
+{"version":3,"file":"OtpVerify.schema.js","sourceRoot":"","sources":["OtpVerify.schema.ts"],"names":[],"mappings":";;;AAAA,6BAAwB;AAEX,QAAA,eAAe,GAAG,OAAC,CAAC,MAAM,CAAC;IACtC,KAAK,EAAE,OAAC,CAAC,MAAM,EAAE,CAAC,KAAK,EAAE;IACzB,IAAI,EAAE,OAAC,CAAC,MAAM,EAAE,CAAC,GAAG,CAAC,CAAC,CAAC,CAAC,GAAG,CAAC,CAAC,CAAC;CAC/B,CAAC,CAAC"}
