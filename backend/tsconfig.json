@@ -17,5 +17,15 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "../packages/**/*"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "../packages/**/*",
+    "src/test/**/*",
+    "src/**/*.test.ts",
+    "src/schema-integrated-app.ts",
+    "src/simple-app.ts",
+    "src/fixed-schema-app.ts",
+    "src/services/storage.ts"
+  ]
 }
