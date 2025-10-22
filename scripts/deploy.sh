@@ -8,7 +8,7 @@ set -e  # Exit on any error
 echo "🚀 Starting deployment..."
 
 # Navigate to app directory
-cd /home/$USER/news-briefing-app
+cd /root/POOSD/POOSD-LargeProject_Team12
 
 # Pull latest changes
 echo "📥 Pulling latest changes from GitHub..."
