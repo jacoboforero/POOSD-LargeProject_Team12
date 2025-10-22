@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -15,9 +15,10 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@contracts/*": ["../packages/contracts/src/*"]
+      "contracts": ["../packages/contracts/src/index.ts"],
+      "contracts/*": ["../packages/contracts/src/*"]
     }
   },
-  "include": ["src/**/*", "../packages/contracts/src/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }
