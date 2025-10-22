@@ -41,7 +41,7 @@ jobs:
              cd /root/POOSD/POOSD-LargeProject_Team12
              git pull origin main
              cd backend
-             npm ci --production
+             npm ci
              npm run build
              pm2 restart news-briefing-api || pm2 start dist/index.js --name news-briefing-api
              pm2 save
