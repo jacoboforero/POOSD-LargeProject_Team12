@@ -1,50 +1,57 @@
-# News Briefing API Documentation
+# 📡 News Briefing API Documentation
 
-## Running API Locally
+Complete API reference for the News Briefing Backend service.
 
-### Prerequisites
+## 🌐 **Base URL**
 
-- Node.js 18+
-- npm or yarn
+```
+http://localhost:3001
+```
 
-### Setup
+## 🔐 **Authentication**
 
-1. Install dependencies:
+The API uses JWT (JSON Web Token) authentication. Get a token by completing the OTP verification flow.
 
-   ```bash
-   npm install
-   ```
+### **Authentication Flow**
 
-2. Copy environment file:
+1. Request OTP with email
+2. Verify OTP with code
+3. Receive JWT token
+4. Use token in `Authorization: Bearer <token>` header
 
-   ```bash
-   cp .env.example .env
-   ```
+---
 
-3. Start development server:
-   ```bash
-   npm run dev
-   ```
+## 📋 **API Endpoints**
 
-The API will be available at `http://localhost:3001`
+### **1. Health Check**
 
-### Environment Variables
+**GET** `/health`
 
-- `PORT`: Server port (default: 3001)
-- `FRONTEND_URL`: Frontend URL for CORS (default: http://localhost:3000)
-- `JWT_SECRET`: JWT signing secret
-- `JWT_EXPIRES_IN`: JWT expiration time (default: 7d)
+Check server status and timestamp.
 
-## API Endpoints
+**Response:**
 
-### Authentication
+```json
+{
+  "status": "ok",
+  "timestamp": "2025-10-22T22:40:34.603Z"
+}
+```
 
-#### Request OTP
+---
 
-```bash
-curl -X POST http://localhost:3001/api/auth/otp/request \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com"}'
+### **2. Request OTP**
+
+**POST** `/api/auth/otp/request`
+
+Request a one-time password for authentication.
+
+**Request Body:**
+
+```json
+{
+  "email": "user@example.com"
+}
 ```
 
 **Response:**
@@ -55,21 +62,32 @@ curl -X POST http://localhost:3001/api/auth/otp/request \
 }
 ```
 
-#### Verify OTP
+**Note:** In dummy mode, any email works and OTP is always `123456`.
 
-```bash
-curl -X POST http://localhost:3001/api/auth/otp/verify \
-  -H "Content-Type: application/json" \
-  -d '{"email": "user@example.com", "code": "123456"}'
+---
+
+### **3. Verify OTP**
+
+**POST** `/api/auth/otp/verify`
+
+Verify OTP code and receive JWT token.
+
+**Request Body:**
+
+```json
+{
+  "email": "user@example.com",
+  "code": "123456"
+}
 ```
 
 **Response:**
 
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token": "mock-jwt-token",
   "user": {
-    "_id": "user-id",
+    "_id": "mock-user-id",
     "email": "user@example.com",
     "emailVerified": true,
     "preferences": {
@@ -84,26 +102,62 @@ curl -X POST http://localhost:3001/api/auth/otp/verify \
       "push": false,
       "frequency": "daily"
     },
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
+    "createdAt": "2025-10-22T22:40:43.520Z",
+    "updatedAt": "2025-10-22T22:40:43.520Z"
   }
 }
 ```
 
-### User Endpoints
+---
 
-#### Get User Profile
+### **4. Get User Profile**
 
-```bash
-curl -X GET http://localhost:3001/api/me \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+**GET** `/api/me`
+
+Get current user's profile information.
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
 ```
 
-#### Get User Usage
+**Response:**
 
-```bash
-curl -X GET http://localhost:3001/api/me/usage \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```json
+{
+  "_id": "mock-user-id",
+  "email": "user@example.com",
+  "emailVerified": true,
+  "preferences": {
+    "topics": [],
+    "interests": [],
+    "jobIndustry": "",
+    "demographic": ""
+  },
+  "timezone": "UTC",
+  "notificationPrefs": {
+    "email": true,
+    "push": false,
+    "frequency": "daily"
+  },
+  "createdAt": "2025-10-22T22:40:43.520Z",
+  "updatedAt": "2025-10-22T22:40:43.520Z"
+}
+```
+
+---
+
+### **5. Get User Usage**
+
+**GET** `/api/me/usage`
+
+Get user's usage statistics and quota information.
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
 ```
 
 **Response:**
@@ -123,93 +177,135 @@ curl -X GET http://localhost:3001/api/me/usage \
 }
 ```
 
-### Briefing Endpoints
+---
 
-#### Generate Briefing
+### **6. Generate Briefing**
 
-```bash
-curl -X POST http://localhost:3001/api/briefings/generate \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "topics": ["technology", "AI"],
-    "interests": ["machine learning"],
-    "jobIndustry": "tech",
-    "demographic": "professional"
-  }'
+**POST** `/api/briefings/generate`
+
+Create a new personalized news briefing.
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
 ```
 
-**Response:**
+**Request Body:**
 
 ```json
 {
-  "briefingId": "briefing-uuid"
+  "topics": ["technology", "AI", "machine learning"],
+  "interests": ["artificial intelligence", "data science"],
+  "jobIndustry": "tech",
+  "demographic": "professional"
 }
 ```
 
-#### Get Briefing Status
-
-```bash
-curl -X GET http://localhost:3001/api/briefings/{briefingId}/status \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
-```
-
 **Response:**
 
 ```json
 {
-  "_id": "briefing-uuid",
-  "status": "done",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
+  "briefingId": "eec102de-121b-4f9f-8747-7c7de2be1000"
 }
 ```
 
-#### Get Briefing Details
+**Note:** Briefing processing takes ~2 seconds in dummy mode.
 
-```bash
-curl -X GET http://localhost:3001/api/briefings/{briefingId} \
-  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+---
+
+### **7. Get Briefing Status**
+
+**GET** `/api/briefings/{briefingId}/status`
+
+Check the processing status of a briefing.
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
 ```
 
 **Response:**
 
 ```json
 {
-  "_id": "briefing-uuid",
-  "userId": "user-id",
+  "_id": "eec102de-121b-4f9f-8747-7c7de2be1000",
   "status": "done",
-  "summary": "This is a stub briefing summary...",
+  "createdAt": "2025-10-22T22:40:46.960Z",
+  "updatedAt": "2025-10-22T22:40:46.960Z"
+}
+```
+
+**Status Values:**
+
+- `queued` - Briefing is waiting to be processed
+- `processing` - Briefing is being generated
+- `done` - Briefing is complete
+- `failed` - Briefing generation failed
+
+---
+
+### **8. Get Briefing Details**
+
+**GET** `/api/briefings/{briefingId}`
+
+Get the complete briefing with articles and summary.
+
+**Headers:**
+
+```
+Authorization: Bearer <jwt-token>
+```
+
+**Response:**
+
+```json
+{
+  "_id": "eec102de-121b-4f9f-8747-7c7de2be1000",
+  "userId": "mock-user-id",
+  "status": "done",
+  "summary": "This is a comprehensive briefing covering the latest developments in technology and AI...",
   "articles": [
     {
-      "title": "Sample Article 1",
+      "title": "Breakthrough in Machine Learning",
       "url": "https://example.com/article1",
-      "summary": "This is a stub article summary.",
-      "publishedAt": "2024-01-01T00:00:00.000Z",
-      "source": "Example News"
+      "summary": "Researchers have made significant progress in neural network optimization...",
+      "publishedAt": "2025-10-22T20:00:00.000Z",
+      "source": "Tech News"
+    },
+    {
+      "title": "AI Ethics in Healthcare",
+      "url": "https://example.com/article2",
+      "summary": "New guidelines address ethical concerns in AI-powered medical devices...",
+      "publishedAt": "2025-10-22T18:30:00.000Z",
+      "source": "Health Tech"
     }
   ],
   "topics": ["technology", "AI"],
   "interests": ["machine learning"],
   "jobIndustry": "tech",
   "demographic": "professional",
-  "createdAt": "2024-01-01T00:00:00.000Z",
-  "updatedAt": "2024-01-01T00:00:00.000Z"
+  "createdAt": "2025-10-22T22:40:46.960Z",
+  "updatedAt": "2025-10-22T22:40:46.960Z"
 }
 ```
 
-## Error Responses
+---
 
-All errors follow the ErrorSchema format:
+## ❌ **Error Responses**
+
+All errors follow a consistent format:
 
 ```json
 {
   "error": {
-    "code": "VALIDATION_FAILED",
-    "message": "Validation failed",
+    "code": "ERROR_CODE",
+    "message": "Human-readable error message",
     "details": [
       {
-        "code": "invalid_type",
+        "code": "validation_error",
         "expected": "string",
         "received": "number",
         "path": ["email"],
@@ -220,78 +316,145 @@ All errors follow the ErrorSchema format:
 }
 ```
 
-### Error Codes
+### **Error Codes**
 
-- `UNAUTHORIZED`: Authentication required or invalid token
-- `FORBIDDEN`: Access denied
-- `NOT_FOUND`: Resource not found
-- `RATE_LIMITED`: Too many requests
-- `QUOTA_EXCEEDED`: Daily/monthly quota exceeded
-- `VALIDATION_FAILED`: Request validation failed
-- `PROVIDER_ERROR`: External service error
-- `INTERNAL_ERROR`: Server error
+| Code                | Description                              | HTTP Status |
+| ------------------- | ---------------------------------------- | ----------- |
+| `UNAUTHORIZED`      | Authentication required or invalid token | 401         |
+| `FORBIDDEN`         | Access denied                            | 403         |
+| `NOT_FOUND`         | Resource not found                       | 404         |
+| `RATE_LIMITED`      | Too many requests                        | 429         |
+| `QUOTA_EXCEEDED`    | Daily/monthly quota exceeded             | 429         |
+| `VALIDATION_FAILED` | Request validation failed                | 400         |
+| `PROVIDER_ERROR`    | External service error                   | 502         |
+| `INTERNAL_ERROR`    | Server error                             | 500         |
 
-## Rate Limiting
+---
+
+## 🔒 **Rate Limiting**
 
 - **Per-IP**: 100 requests per 15 minutes
 - **Per-User**: 200 requests per 15 minutes (authenticated users)
 - **Daily Quota**: 10 briefings per day (configurable)
 
-## Testing the Complete Flow
+**Rate Limit Headers:**
 
-1. **Request OTP:**
-
-   ```bash
-   curl -X POST http://localhost:3001/api/auth/otp/request \
-     -H "Content-Type: application/json" \
-     -d '{"email": "test@example.com"}'
-   ```
-
-2. **Check console for OTP code** (stubbed implementation logs the code)
-
-3. **Verify OTP:**
-
-   ```bash
-   curl -X POST http://localhost:3001/api/auth/otp/verify \
-     -H "Content-Type: application/json" \
-     -d '{"email": "test@example.com", "code": "123456"}'
-   ```
-
-4. **Use the returned JWT token for authenticated requests**
-
-5. **Generate a briefing:**
-
-   ```bash
-   curl -X POST http://localhost:3001/api/briefings/generate \
-     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     -H "Content-Type: application/json" \
-     -d '{"topics": ["technology"]}'
-   ```
-
-6. **Check briefing status (wait 1-2 seconds):**
-
-   ```bash
-   curl -X GET http://localhost:3001/api/briefings/{briefingId}/status \
-     -H "Authorization: Bearer YOUR_JWT_TOKEN"
-   ```
-
-7. **Get completed briefing:**
-   ```bash
-   curl -X GET http://localhost:3001/api/briefings/{briefingId} \
-     -H "Authorization: Bearer YOUR_JWT_TOKEN"
-   ```
-
-## Health Check
-
-```bash
-curl -X GET http://localhost:3001/health
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1640995200
 ```
 
-**Response:**
+---
+
+## 🧪 **Testing Examples**
+
+### **Complete Flow Example**
+
+```bash
+# 1. Health check
+curl http://localhost:3001/health
+
+# 2. Request OTP
+curl -X POST http://localhost:3001/api/auth/otp/request \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com"}'
+
+# 3. Verify OTP
+curl -X POST http://localhost:3001/api/auth/otp/verify \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "code": "123456"}'
+
+# 4. Get user profile (use token from step 3)
+curl -X GET http://localhost:3001/api/me \
+  -H "Authorization: Bearer mock-jwt-token"
+
+# 5. Generate briefing
+curl -X POST http://localhost:3001/api/briefings/generate \
+  -H "Authorization: Bearer mock-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"topics": ["technology"]}'
+
+# 6. Check briefing status (use briefingId from step 5)
+curl -X GET http://localhost:3001/api/briefings/{briefingId}/status \
+  -H "Authorization: Bearer mock-jwt-token"
+
+# 7. Get briefing details
+curl -X GET http://localhost:3001/api/briefings/{briefingId} \
+  -H "Authorization: Bearer mock-jwt-token"
+```
+
+---
+
+## 📝 **Request/Response Examples**
+
+### **Minimal Briefing Request**
 
 ```json
 {
-  "status": "ok",
-  "timestamp": "2024-01-01T00:00:00.000Z"
+  "topics": ["news"]
 }
 ```
+
+### **Full Briefing Request**
+
+```json
+{
+  "topics": ["technology", "business", "science"],
+  "interests": ["AI", "startups", "research"],
+  "jobIndustry": "tech",
+  "demographic": "professional"
+}
+```
+
+### **User Preferences**
+
+```json
+{
+  "preferences": {
+    "topics": ["technology", "AI"],
+    "interests": ["machine learning"],
+    "jobIndustry": "tech",
+    "demographic": "professional"
+  }
+}
+```
+
+---
+
+## 🔧 **Development Notes**
+
+### **Dummy Data**
+
+- **OTP Code**: Always `123456`
+- **JWT Token**: `mock-jwt-token`
+- **Processing Time**: ~2 seconds
+- **Storage**: In-memory (resets on restart)
+
+### **Production Considerations**
+
+- Replace dummy OTP with real email service
+- Replace in-memory storage with database
+- Implement real briefing generation
+- Add proper logging and monitoring
+
+---
+
+## 📚 **Additional Resources**
+
+- **[Main README](./README.md)** - Quick start and overview
+- **[Testing Guide](./TESTING.md)** - Comprehensive testing instructions
+- **[Environment Setup](./.env.example)** - Environment configuration
+
+---
+
+## 🆘 **Support**
+
+For issues or questions:
+
+1. Check server logs for error details
+2. Verify environment variables are set
+3. Test individual endpoints with curl
+4. Review this documentation for correct usage
+
+**Happy coding!** 🚀
