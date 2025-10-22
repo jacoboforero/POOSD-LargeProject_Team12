@@ -161,7 +161,7 @@ NODE_ENV=production
 FRONTEND_URL=https://your-domain.com
 
 # JWT Configuration
-JWT_SECRET=33333bf9a79f0b4f40068983210508e3e76416b47c867a8b166df1aa6fbfa9813e9c15c892fc38d0c32db80c2a7371390fa1e465f5a5c4b2bfc9d4731de6edf6
+JWT_SECRET=your-jwt-secret-here
 JWT_EXPIRES_IN=7d
 
 # Rate Limiting
@@ -169,7 +169,7 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 
 # Database Configuration
-MONGODB_URI=mongodb+srv://root:root@main.amakhgx.mongodb.net/news-briefing?retryWrites=true&w=majority&appName=Main
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/news-briefing?retryWrites=true&w=majority&appName=Main
 
 # Quota Configuration
 DAILY_QUOTA_LIMIT=10
