@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import { authService } from "../services/authService";
+import { verifyToken } from "../utils/jwt";
+import { UserModel } from "../models/User.model";
 import { ERROR_CODES } from "../../../packages/contracts/src";
 
 // Extend Request interface to include user
@@ -29,8 +30,13 @@ export const authenticateToken = async (
       });
     }
 
-    const session = await authService.validateToken(token);
-    if (!session) {
+    // Verify JWT token
+    const payload = verifyToken(token);
+
+    // Get user from database
+    const user = await UserModel.findById(payload.userId);
+
+    if (!user) {
       return res.status(401).json({
         error: {
           code: ERROR_CODES.UNAUTHORIZED,
@@ -39,7 +45,13 @@ export const authenticateToken = async (
       });
     }
 
-    req.user = session.user;
+    // Attach user to request
+    req.user = {
+      _id: String(user._id),
+      email: user.email,
+      emailVerified: user.emailVerified,
+    };
+
     next();
   } catch (error) {
     return res.status(401).json({

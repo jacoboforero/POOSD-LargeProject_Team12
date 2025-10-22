@@ -1,96 +1,144 @@
-import { storage } from "./storage";
-import {
-  BriefingGenerateRequest,
-  Briefing,
-} from "../../../packages/contracts/src";
+import { UserModel } from "../models/User.model";
+import { BriefingModel } from "../models/Briefing.model";
 
 export class BriefingService {
-  async generateBriefing(
-    userId: string,
-    request: BriefingGenerateRequest
-  ): Promise<{ briefingId: string }> {
-    // Create briefing with queued status
-    const briefing = storage.createBriefing(userId, request);
+  async generate(userId: string, request: any = {}) {
+    const user = await UserModel.findById(userId);
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
 
-    // Start processing (stub worker will handle this)
-    // In a real implementation, this would queue a job
-    setTimeout(() => {
-      this.processBriefing(briefing._id);
-    }, 1000 + Math.random() * 1000); // Random delay between 1-2 seconds
+    if (new Date() >= user.limits.resetAt) {
+      user.limits.generatedCountToday = 0;
+      user.limits.resetAt = this.getNextResetTime();
+      await user.save();
+    }
 
-    return { briefingId: briefing._id };
+    if (user.limits.generatedCountToday >= user.limits.dailyGenerateCap) {
+      throw new Error('Daily generation limit reached');
+    }
+
+    const briefing = await BriefingModel.create({
+      userId,
+      status: 'queued',
+      request: {
+        topics: request.topics || user.preferences.topics,
+        interests: request.interests || user.preferences.interests,
+        jobIndustry: request.jobIndustry || user.preferences.jobIndustry,
+        demographic: request.demographic || user.preferences.demographic,
+        source: 'news_api',
+      },
+      articles: [],
+      queuedAt: new Date(),
+    });
+
+    user.limits.generatedCountToday += 1;
+    await user.save();
+
+    this.processInBackground(String(briefing._id));
+
+    return { briefingId: String(briefing._id) };
   }
 
-  async getBriefingStatus(briefingId: string) {
-    const briefing = storage.getBriefing(briefingId);
+  async getStatus(briefingId: string, userId: string) {
+    const briefing = await BriefingModel.findById(briefingId);
+    
     if (!briefing) {
-      throw new Error("Briefing not found");
+      throw new Error('Briefing not found');
+    }
+
+    if (briefing.userId !== userId) {
+      throw new Error('Unauthorized');
     }
 
     return {
-      _id: briefing._id,
+      _id: String(briefing._id),
       status: briefing.status,
+      statusReason: briefing.statusReason,
+      progress: briefing.progress,
       createdAt: briefing.createdAt,
       updatedAt: briefing.updatedAt,
     };
   }
 
-  async getBriefing(briefingId: string) {
-    const briefing = storage.getBriefing(briefingId);
+  async get(briefingId: string, userId: string) {
+    const briefing = await BriefingModel.findById(briefingId);
+    
     if (!briefing) {
-      throw new Error("Briefing not found");
+      throw new Error('Briefing not found');
     }
 
-    return briefing;
+    if (briefing.userId !== userId) {
+      throw new Error('Unauthorized');
+    }
+
+    return {
+      _id: String(briefing._id),
+      userId: briefing.userId,
+      status: briefing.status,
+      statusReason: briefing.statusReason,
+      request: briefing.request,
+      articles: briefing.articles || [],
+      summary: briefing.summary,
+      error: briefing.error,
+      queuedAt: briefing.queuedAt,
+      fetchStartedAt: briefing.fetchStartedAt,
+      summarizeStartedAt: briefing.summarizeStartedAt,
+      completedAt: briefing.completedAt,
+      progress: briefing.progress,
+      createdAt: briefing.createdAt,
+      updatedAt: briefing.updatedAt,
+    };
   }
 
-  async getUserBriefings(userId: string, limit = 10, offset = 0) {
-    const allBriefings = storage.getUserBriefings(userId);
-    return allBriefings.slice(offset, offset + limit);
+  private async processInBackground(briefingId: string) {
+    setTimeout(async () => {
+      try {
+        const briefing = await BriefingModel.findById(briefingId);
+        
+        if (!briefing) return;
+
+        briefing.status = 'done';
+        briefing.completedAt = new Date();
+        briefing.progress = 100;
+        
+        briefing.summary = {
+          sections: [
+            {
+              category: 'technology',
+              text: 'This is a stub summary. Real news integration coming soon.',
+            },
+          ],
+          generatedAt: new Date(),
+          llm: {
+            provider: 'openai',
+            model: 'gpt-4o-mini',
+            inputTokens: 0,
+            outputTokens: 0,
+          },
+        };
+        
+        briefing.articles = [
+          {
+            title: 'Sample Article',
+            url: 'https://example.com/article',
+            source: 'Example News',
+          },
+        ];
+
+        await briefing.save();
+        console.log(`✅ Briefing ${briefingId} completed`);
+      } catch (error) {
+        console.error(`❌ Error processing briefing ${briefingId}:`, error);
+      }
+    }, 3000);
   }
 
-  // Stub method for processing briefings
-  private async processBriefing(briefingId: string) {
-    const briefing = storage.getBriefing(briefingId);
-    if (!briefing) return;
-
-    // Update status to processing
-    storage.updateBriefing(briefingId, { status: "processing" });
-
-    // Simulate processing time
-    setTimeout(() => {
-      // Update with stub data
-      const stubSummary =
-        `This is a stub briefing summary for topics: ${briefing.topics.join(
-          ", "
-        )}. ` +
-        `Generated at ${new Date().toISOString()}. ` +
-        `This would normally contain AI-generated content based on recent news articles.`;
-
-      const stubArticles = [
-        {
-          title: "Sample Article 1",
-          url: "https://example.com/article1",
-          summary: "This is a stub article summary.",
-          publishedAt: new Date(),
-          source: "Example News",
-        },
-        {
-          title: "Sample Article 2",
-          url: "https://example.com/article2",
-          summary: "This is another stub article summary.",
-          publishedAt: new Date(),
-          source: "Example News",
-        },
-      ];
-
-      storage.updateBriefing(briefingId, {
-        status: "done",
-        summary: stubSummary,
-        articles: stubArticles,
-      });
-    }, 500); // Additional 500ms processing time
+  private getNextResetTime(): Date {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
   }
 }
-
-export const briefingService = new BriefingService();

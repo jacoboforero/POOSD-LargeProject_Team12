@@ -1,32 +1,19 @@
 import { Router } from "express";
-import { z } from "zod";
-import {
-  BriefingGenerateRequestSchema,
-  BriefingResponseSchema,
-  BriefingStatusResponseSchema,
-  BriefingGenerateResponseSchema,
-} from "../../../packages/contracts/src";
-import { briefingService } from "../services/briefingService";
-import { validateRequest, validateResponse } from "../middleware/validation";
+import { BriefingService } from "../services/briefingService";
 import { authenticateToken } from "../middleware/auth";
-import { userRateLimit, dailyQuotaCheck } from "../middleware/rateLimiter";
+import { userRateLimit } from "../middleware/rateLimiter";
 
 const router = Router();
+const briefingService = new BriefingService();
 
 // POST /api/briefings/generate
 router.post(
   "/generate",
   authenticateToken,
   userRateLimit,
-  dailyQuotaCheck,
-  validateRequest({ body: BriefingGenerateRequestSchema }),
-  validateResponse(BriefingGenerateResponseSchema),
   async (req, res) => {
     try {
-      const result = await briefingService.generateBriefing(
-        req.user._id,
-        req.body
-      );
+      const result = await briefingService.generate(req.user._id, req.body);
       res.json(result);
     } catch (error) {
       throw error;
@@ -39,14 +26,9 @@ router.get(
   "/:id/status",
   authenticateToken,
   userRateLimit,
-  dailyQuotaCheck,
-  validateRequest({
-    params: z.object({ id: z.string() }),
-  }),
-  validateResponse(BriefingStatusResponseSchema),
   async (req, res) => {
     try {
-      const status = await briefingService.getBriefingStatus(req.params.id);
+      const status = await briefingService.getStatus(req.params.id, req.user._id);
       res.json(status);
     } catch (error) {
       throw error;
@@ -59,14 +41,9 @@ router.get(
   "/:id",
   authenticateToken,
   userRateLimit,
-  dailyQuotaCheck,
-  validateRequest({
-    params: z.object({ id: z.string() }),
-  }),
-  validateResponse(BriefingResponseSchema),
   async (req, res) => {
     try {
-      const briefing = await briefingService.getBriefing(req.params.id);
+      const briefing = await briefingService.get(req.params.id, req.user._id);
       res.json(briefing);
     } catch (error) {
       throw error;

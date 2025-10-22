@@ -1,26 +1,19 @@
 import { Router } from "express";
-import { z } from "zod";
-import {
-  MeResponseSchema,
-  UsageResponseSchema,
-} from "../../../packages/contracts/src";
-import { userService } from "../services/userService";
-import { validateRequest, validateResponse } from "../middleware/validation";
+import { UserService } from "../services/userService";
 import { authenticateToken } from "../middleware/auth";
-import { userRateLimit, dailyQuotaCheck } from "../middleware/rateLimiter";
+import { userRateLimit } from "../middleware/rateLimiter";
 
 const router = Router();
+const userService = new UserService();
 
 // GET /api/me
 router.get(
   "/me",
   authenticateToken,
   userRateLimit,
-  dailyQuotaCheck,
-  validateResponse(MeResponseSchema),
   async (req, res) => {
     try {
-      const user = await userService.getMe(req.user._id);
+      const user = await userService.getUser(req.user._id);
       res.json(user);
     } catch (error) {
       throw error;
@@ -33,8 +26,6 @@ router.get(
   "/me/usage",
   authenticateToken,
   userRateLimit,
-  dailyQuotaCheck,
-  validateResponse(UsageResponseSchema),
   async (req, res) => {
     try {
       const usage = await userService.getUsage(req.user._id);

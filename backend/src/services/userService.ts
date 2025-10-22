@@ -1,86 +1,73 @@
-import { storage } from "./storage";
-import {
-  MeResponseSchema,
-  UsageResponseSchema,
-} from "../../../packages/contracts/src";
+import { UserModel } from "../models/User.model";
 
 export class UserService {
-  async getMe(userId: string) {
-    const user = storage.getUserById(userId);
+  async getUser(userId: string) {
+    const user = await UserModel.findById(userId);
+    
     if (!user) {
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
     return {
-      _id: user._id,
+      _id: String(user._id),
       email: user.email,
       emailVerified: user.emailVerified,
       preferences: user.preferences,
+      limits: user.limits,
       timezone: user.timezone,
       notificationPrefs: user.notificationPrefs,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
-    };
-  }
-
-  async getUsage(userId: string) {
-    const user = storage.getUserById(userId);
-    if (!user) {
-      throw new Error("User not found");
-    }
-
-    const briefings = storage.getUserBriefings(userId);
-
-    // Calculate usage statistics
-    const totalBriefings = briefings.length;
-    const completedBriefings = briefings.filter(
-      (b) => b.status === "done"
-    ).length;
-    const queuedBriefings = briefings.filter(
-      (b) => b.status === "queued"
-    ).length;
-    const failedBriefings = briefings.filter(
-      (b) => b.status === "failed"
-    ).length;
-
-    // Calculate daily usage (last 30 days)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-    const recentBriefings = briefings.filter(
-      (b) => b.createdAt >= thirtyDaysAgo
-    );
-    const dailyUsage = recentBriefings.length;
-
-    return {
-      totalBriefings,
-      completedBriefings,
-      queuedBriefings,
-      failedBriefings,
-      dailyUsage,
-      quota: {
-        daily: 10, // Hardcoded for now
-        monthly: 100, // Hardcoded for now
-        remaining: Math.max(0, 10 - dailyUsage), // Daily remaining
-      },
     };
   }
 
   async updatePreferences(userId: string, preferences: any) {
-    const user = storage.updateUser(userId, { preferences });
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      { 
+        $set: { 
+          preferences,
+          updatedAt: new Date()
+        } 
+      },
+      { new: true }
+    );
+
     if (!user) {
-      throw new Error("User not found");
+      throw new Error('User not found');
     }
 
+    return this.getUser(userId);
+  }
+
+  async getUsage(userId: string) {
+    const user = await UserModel.findById(userId);
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    if (new Date() >= user.limits.resetAt) {
+      user.limits.generatedCountToday = 0;
+      user.limits.resetAt = this.getNextResetTime();
+      await user.save();
+    }
+
+    const dailyCap = user.limits.dailyGenerateCap;
+    const used = user.limits.generatedCountToday;
+
     return {
-      _id: user._id,
-      email: user.email,
-      emailVerified: user.emailVerified,
-      preferences: user.preferences,
-      timezone: user.timezone,
-      notificationPrefs: user.notificationPrefs,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
+      dailyGenerateCap: dailyCap,
+      generatedCountToday: used,
+      remaining: Math.max(0, dailyCap - used),
+      resetAt: user.limits.resetAt.toISOString(),
     };
   }
-}
 
-export const userService = new UserService();
+  private getNextResetTime(): Date {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    return tomorrow;
+  }
+}

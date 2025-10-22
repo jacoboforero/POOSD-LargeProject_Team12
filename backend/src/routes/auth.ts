@@ -5,18 +5,17 @@ import {
   OtpVerifySchema,
   SessionSchema,
 } from "../../../packages/contracts/src";
-import { authService } from "../services/authService";
+import { AuthService } from "../services/authService";
 import { validateRequest, validateResponse } from "../middleware/validation";
 import { ipRateLimit } from "../middleware/rateLimiter";
 
 const router = Router();
+const authService = new AuthService();
 
 // POST /api/auth/otp/request
 router.post(
   "/otp/request",
   ipRateLimit,
-  validateRequest({ body: OtpRequestSchema }),
-  validateResponse(z.object({ success: z.boolean() })),
   async (req, res) => {
     try {
       await authService.requestOtp(req.body);
@@ -31,8 +30,6 @@ router.post(
 router.post(
   "/otp/verify",
   ipRateLimit,
-  validateRequest({ body: OtpVerifySchema }),
-  validateResponse(SessionSchema),
   async (req, res) => {
     try {
       const { email, code } = req.body;
