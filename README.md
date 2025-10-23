@@ -35,15 +35,20 @@ Backend runs at `http://localhost:3001`
 # Health check
 curl http://localhost:3001/health
 
-# Request OTP
-curl -X POST http://localhost:3001/api/auth/otp/request \
+# Register new user
+curl -X POST http://localhost:3001/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com"}'
 
 # Check server logs for OTP code, then verify
-curl -X POST http://localhost:3001/api/auth/otp/verify \
+curl -X POST http://localhost:3001/api/auth/verify \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "code": "YOUR_OTP"}'
+
+# Login existing user (returns new OTP)
+curl -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com"}'
 ```
 
 ## 📚 Documentation

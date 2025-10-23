@@ -43,11 +43,42 @@ Check server status.
 
 ### Authentication
 
-#### Request OTP
+#### Register New User
 
-**POST** `/api/auth/otp/request`
+**POST** `/api/auth/register`
 
-Request a one-time password for authentication.
+Register a new user account. Creates a new user and sends an OTP for verification.
+
+**Request:**
+
+```json
+{
+  "email": "newuser@example.com"
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Registration successful. Please check your console for OTP code."
+}
+```
+
+**Errors:**
+
+- `400` - User already exists (use `/api/auth/login` instead)
+
+**Note:** OTP is logged to server console. Check server logs for the 6-digit code. OTP expires in 10 minutes.
+
+---
+
+#### Login Existing User
+
+**POST** `/api/auth/login`
+
+Login an existing user. Sends an OTP for authentication.
 
 **Request:**
 
@@ -61,9 +92,14 @@ Request a one-time password for authentication.
 
 ```json
 {
-  "success": true
+  "success": true,
+  "message": "OTP sent. Please check your console for the code."
 }
 ```
+
+**Errors:**
+
+- `400` - User not found (use `/api/auth/register` instead)
 
 **Note:** OTP is logged to server console. Check server logs for the 6-digit code. OTP expires in 10 minutes.
 
@@ -71,9 +107,9 @@ Request a one-time password for authentication.
 
 #### Verify OTP
 
-**POST** `/api/auth/otp/verify`
+**POST** `/api/auth/verify`
 
-Verify OTP and receive JWT token.
+Verify OTP code and receive JWT authentication token. Works for both registration and login flows.
 
 **Request:**
 
@@ -106,6 +142,12 @@ Verify OTP and receive JWT token.
   }
 }
 ```
+
+**Errors:**
+
+- `400` - Invalid OTP code
+- `400` - OTP expired (request new OTP)
+- `400` - Too many failed attempts (request new OTP)
 
 ---
 
@@ -326,31 +368,57 @@ X-RateLimit-Reset: 1729684800
 
 ## Complete Flow Example
 
+### New User Registration Flow
+
 ```bash
 # 1. Health check
 curl http://localhost:3001/health
 
-# 2. Request OTP
-curl -X POST http://localhost:3001/api/auth/otp/request \
+# 2. Register new user
+curl -X POST http://localhost:3001/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com"}'
+  -d '{"email": "newuser@example.com"}'
 
-# 3. Check server logs for OTP, then verify
-curl -X POST http://localhost:3001/api/auth/otp/verify \
+# 3. Check server logs for OTP code, then verify
+curl -X POST http://localhost:3001/api/auth/verify \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "code": "123456"}'
+  -d '{"email": "newuser@example.com", "code": "123456"}'
 
 # Save the token from response
 
 # 4. Get user profile
 curl http://localhost:3001/api/me/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
+```
 
-# 5. Check usage
+### Existing User Login Flow
+
+```bash
+# 1. Login existing user
+curl -X POST http://localhost:3001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email": "existinguser@example.com"}'
+
+# 2. Check server logs for OTP, then verify
+curl -X POST http://localhost:3001/api/auth/verify \
+  -H "Content-Type: application/json" \
+  -d '{"email": "existinguser@example.com", "code": "123456"}'
+
+# Save the token from response
+```
+
+### Using Authenticated Endpoints
+
+```bash
+# Get user profile
+curl http://localhost:3001/api/me/me \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# Check usage
 curl http://localhost:3001/api/me/usage \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 
-# 6. Generate briefing
+# Generate briefing
 curl -X POST http://localhost:3001/api/briefings/generate \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
@@ -358,11 +426,11 @@ curl -X POST http://localhost:3001/api/briefings/generate \
 
 # Save briefingId from response
 
-# 7. Check status (poll until status = "done")
+# Check status (poll until status = "done")
 curl http://localhost:3001/api/briefings/BRIEFING_ID/status \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 
-# 8. Get complete briefing
+# Get complete briefing
 curl http://localhost:3001/api/briefings/BRIEFING_ID \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
