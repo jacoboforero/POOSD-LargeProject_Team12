@@ -43,11 +43,11 @@ app.use(ipRateLimit);
 
 // Health check
 app.get("/health", (req, res) => {
-  res.json({ 
-    status: "ok", 
-    version: "1.0.1",
+  res.json({
+    status: "ok",
+    version: "1.0.2",
     environment: process.env.NODE_ENV || "development",
-    timestamp: new Date().toISOString() 
+    timestamp: new Date().toISOString(),
   });
 });
 
