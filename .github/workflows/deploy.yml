@@ -37,11 +37,20 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          script_stop: true
           script: |
+            set -e
+            echo "=== Starting deployment ==="
             cd /root/POOSD/POOSD-LargeProject_Team12
+            echo "=== Pulling latest code ==="
             git pull origin main
             cd backend
+            echo "=== Installing dependencies ==="
             npm ci
+            echo "=== Building application ==="
             npm run build
+            echo "=== Restarting PM2 ==="
             pm2 restart news-briefing-api || pm2 start dist/index.js --name news-briefing-api
             pm2 save
+            echo "=== Deployment complete ==="
+            pm2 list
