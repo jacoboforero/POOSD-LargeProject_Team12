@@ -42,26 +42,24 @@ jobs:
             set -e
             echo "=== Starting deployment ==="
             cd /root/POOSD/POOSD-LargeProject_Team12
-
-            echo "=== Backing up .env file ==="
-            [ -f backend/.env ] && cp backend/.env /tmp/backend.env.backup || echo "No .env to backup"
             
-            echo "=== Fetching latest code ==="
+            echo "=== Move .env OUT of repo temporarily ==="
+            [ -f backend/.env ] && mv backend/.env /tmp/production.env || echo "No .env found"
+            
+            echo "=== Pull latest code ==="
             git fetch origin main
-            
-            echo "=== Resetting to origin/main (preserving .env) ==="
             git reset --hard origin/main
             
-            echo "=== Restoring .env file ==="
-            [ -f /tmp/backend.env.backup ] && cp /tmp/backend.env.backup backend/.env && echo "✓ .env restored" || echo "⚠️  No .env backup found"
-
+            echo "=== Move .env BACK into backend ==="
+            [ -f /tmp/production.env ] && mv /tmp/production.env backend/.env && echo "✓ Production .env restored"
+            
             cd backend
-
-            echo "=== Ensuring .env exists ==="
+            
+            echo "=== Verify .env exists ==="
             if [ ! -f .env ]; then
-              echo "⚠️  WARNING: No .env file found! Creating from .env.example"
-              cp .env.example .env
-              echo "Please update backend/.env with production values!"
+              echo "❌ ERROR: No .env file! Deployment cannot continue."
+              echo "Please create backend/.env on the server with production values!"
+              exit 1
             fi
 
             echo "=== Installing dependencies ==="
