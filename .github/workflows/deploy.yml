@@ -42,19 +42,19 @@ jobs:
             set -e
             echo "=== Starting deployment ==="
             cd /root/POOSD/POOSD-LargeProject_Team12
-            
+
             echo "=== Move .env OUT of repo temporarily ==="
             [ -f backend/.env ] && mv backend/.env /tmp/production.env || echo "No .env found"
-            
+
             echo "=== Pull latest code ==="
             git fetch origin main
             git reset --hard origin/main
-            
+
             echo "=== Move .env BACK into backend ==="
             [ -f /tmp/production.env ] && mv /tmp/production.env backend/.env && echo "✓ Production .env restored"
-            
+
             cd backend
-            
+
             echo "=== Verify .env exists ==="
             if [ ! -f .env ]; then
               echo "❌ ERROR: No .env file! Deployment cannot continue."
@@ -72,5 +72,19 @@ jobs:
             pm2 restart news-briefing-api || pm2 start dist/backend/src/index.js --name news-briefing-api
             pm2 save
 
-            echo "=== Deployment complete ==="
+            echo "=== Waiting for app to start ==="
+            sleep 5
+
+            echo "=== Checking PM2 status ==="
             pm2 list
+
+            echo "=== Verifying API responds ==="
+            if curl -f http://localhost:3001/health > /dev/null 2>&1; then
+              echo "✅ API is responding!"
+              echo "=== Deployment successful ==="
+            else
+              echo "❌ API is not responding!"
+              echo "=== Checking logs ==="
+              pm2 logs news-briefing-api --lines 30 --nostream
+              exit 1
+            fi
