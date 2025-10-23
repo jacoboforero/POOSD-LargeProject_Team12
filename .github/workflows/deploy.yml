@@ -31,6 +31,16 @@ jobs:
           cd backend
           npm run build
 
+      - name: Copy dist to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          source: "backend/dist/"
+          target: "/root/POOSD/POOSD-LargeProject_Team12/"
+          strip_components: 0
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -41,32 +51,17 @@ jobs:
           script: |
             set -e
             echo "=== Starting deployment ==="
-            cd /root/POOSD/POOSD-LargeProject_Team12
-
-            echo "=== Move .env OUT of repo temporarily ==="
-            [ -f backend/.env ] && mv backend/.env /tmp/production.env || echo "No .env found"
-
-            echo "=== Pull latest code ==="
-            git fetch origin main
-            git reset --hard origin/main
-
-            echo "=== Move .env BACK into backend ==="
-            [ -f /tmp/production.env ] && mv /tmp/production.env backend/.env && echo "✓ Production .env restored"
-
-            cd backend
-
+            cd /root/POOSD/POOSD-LargeProject_Team12/backend
+            
             echo "=== Verify .env exists ==="
             if [ ! -f .env ]; then
               echo "❌ ERROR: No .env file! Deployment cannot continue."
               echo "Please create backend/.env on the server with production values!"
               exit 1
             fi
-
-            echo "=== Installing dependencies ==="
-            npm ci
-
-            echo "=== Building application ==="
-            npm run build
+            
+            echo "=== Installing production dependencies ==="
+            npm ci --omit=dev
 
             echo "=== Restarting PM2 ==="
             pm2 restart news-briefing-api || pm2 start dist/backend/src/index.js --name news-briefing-api
