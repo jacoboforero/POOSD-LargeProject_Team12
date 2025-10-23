@@ -1,88 +1,150 @@
-# Personalized News Briefing Web App
+# Personalized News Briefing App
 
-A MERN stack application that generates personalized news briefings for users based on their preferences and interests.
+A web application that generates personalized news briefings based on user preferences.
 
-## Overview
-
-This project provides on-demand personalized news briefings through a web interface and mobile app. Users can set their preferences for topics, demographics, and interests, and receive AI-generated summaries of relevant news articles.
-
-## Tech Stack
-
-- **Frontend**: Next.js (React) with Tailwind CSS
-- **Mobile**: Flutter (cross-platform)
-- **Backend**: Express.js (Node.js)
-- **Database**: MongoDB Atlas
-- **AI/ML**: OpenAI GPT for summarization
-- **Deployment**: DigitalOcean Droplet
-
-## Features
-
-- Email-based authentication with OTP
-- Personalized news briefings based on user preferences
-- Real-time briefing generation with status polling
-- Cross-platform support (Web + Mobile)
-- Daily generation limits per user
-- Responsive design with modern UI
-
-## Project Structure
-
-```
-packages/
-├── contracts/          # Shared TypeScript schemas and DTOs
-│   ├── src/
-│   │   ├── domain/     # Domain models
-│   │   ├── dto/        # Data transfer objects
-│   │   └── errors/     # Error handling schemas
-│   └── README.md
-└── docs/
-    └── Architecture.md # Detailed architecture documentation
-```
-
-## Getting Started
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js 20+
 - MongoDB Atlas account
-- OpenAI API key
-- News API key
-- Flutter SDK (for mobile development)
+- GitHub account (for deployment)
 
-### Installation
-
-1. Clone the repository
-2. Install dependencies: `npm install` or `pnpm install`
-3. Set up environment variables (see `.env.example`)
-4. Run the development server: `npm run dev`
-
-### Environment Variables
+### Local Development
 
 ```bash
-# API
-PORT=4000
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/news-briefing-app
-JWT_SECRET=your-jwt-secret
-OPENAI_API_KEY=sk-...
-NEWS_API_KEY=your-news-api-key
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=your-resend-key
-DAILY_GENERATE_CAP=3
+# Clone repository
+git clone <repo-url>
+cd POOSD-LargeProject_Team12
 
-# Web
-NEXT_PUBLIC_API_BASE=/api
+# Setup backend
+cd backend
+npm install
+cp .env.example .env
+# Edit .env with your credentials
+
+# Run backend
+npm run dev
 ```
 
-## Development
+Backend runs at `http://localhost:3001`
 
-- **Web**: `npm run dev` (Next.js development server)
-- **API**: `npm run dev` (Express.js with hot reload)
-- **Mobile**: `flutter run` (Flutter development)
+### Test the API
 
-## Documentation
+```bash
+# Health check
+curl http://localhost:3001/health
 
-For detailed architecture information, API specifications, and implementation details, see [docs/Architecture.md](docs/Architecture.md).
+# Request OTP
+curl -X POST http://localhost:3001/api/auth/otp/request \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com"}'
 
-## License
+# Check server logs for OTP code, then verify
+curl -X POST http://localhost:3001/api/auth/otp/verify \
+  -H "Content-Type: application/json" \
+  -d '{"email": "test@example.com", "code": "YOUR_OTP"}'
+```
 
-This project is part of a university course (POOSD - Principles of Object-Oriented Software Design).
+## 📚 Documentation
 
+- **[API Documentation](backend/API_DOCUMENTATION.md)** - Complete API reference
+- **[Backend Setup](backend/README.md)** - Backend development guide
+- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment with GitHub Actions
+- **[Architecture](docs/Architecture.md)** - System architecture overview
+- **[Security](SECURITY.md)** - Security guidelines
+
+## 🏗️ Tech Stack
+
+- **Backend:** Express.js (TypeScript) + MongoDB
+- **Authentication:** JWT with OTP via email
+- **Deployment:** GitHub Actions → DigitalOcean Droplet
+- **Future:** Next.js frontend, OpenAI integration, News APIs
+
+## 📁 Project Structure
+
+```
+backend/
+├── src/
+│   ├── routes/        # API routes
+│   ├── services/      # Business logic
+│   ├── models/        # MongoDB models
+│   ├── middleware/    # Auth, rate limiting, errors
+│   └── utils/         # JWT utilities
+└── dist/              # Compiled JavaScript
+
+packages/
+└── contracts/         # Shared TypeScript schemas
+
+.github/workflows/     # CI/CD pipelines
+```
+
+## 🔧 Current Status
+
+**✅ Implemented:**
+
+- OTP-based authentication with JWT
+- User management and preferences
+- Briefing generation API (with dummy data)
+- MongoDB integration
+- Rate limiting and security middleware
+- Automated deployment pipeline
+
+**🚧 In Progress:**
+
+- News API integration
+- OpenAI summarization
+- Email service (OTPs currently log to console)
+- Next.js frontend
+
+## 📝 Environment Variables
+
+Required for backend (see `backend/.env.example`):
+
+- `MONGODB_URI` - MongoDB connection string
+- `JWT_SECRET` - Secret for JWT signing
+- `PORT` - Server port (default: 3001)
+
+Future integration:
+
+- `OPENAI_API_KEY` - For summarization
+- `NEWS_API_KEY` - For news articles
+- `RESEND_API_KEY` - For email OTPs
+
+## 🚀 Deployment
+
+Automated deployment via GitHub Actions:
+
+1. Push to `main` branch
+2. GitHub Actions builds and tests
+3. Deploys to DigitalOcean server via SSH
+4. PM2 restarts the application
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for setup instructions.
+
+## 🆘 Troubleshooting
+
+**Server won't start:**
+
+- Check MongoDB connection string in `.env`
+- Ensure Node.js 20+ is installed
+- Run `npm install` in backend directory
+
+**Authentication fails:**
+
+- OTPs are logged to server console (check logs)
+- OTPs expire after 10 minutes
+- Maximum 5 attempts per OTP
+
+**API returns 404:**
+
+- Verify server is running: `curl http://localhost:3001/health`
+- Check correct port (3001 for backend)
+
+## 👥 Team
+
+POOSD Large Project - Team 12
+
+## 📄 License
+
+Educational project for Principles of Object-Oriented Software Design course.

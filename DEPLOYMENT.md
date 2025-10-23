@@ -1,196 +1,426 @@
-# 🚀 Deployment Guide
+# Deployment Guide
 
-This guide explains how to set up automated deployment for the news briefing app.
+Automated deployment to DigitalOcean via GitHub Actions.
 
-## 📋 Prerequisites
+## Overview
 
-- GitHub repository with your code
-- DigitalOcean Droplet (Ubuntu server)
-- SSH access to your server
-- GitHub repository secrets configured
+- **Server:** DigitalOcean Droplet (Ubuntu)
+- **Server IP:** `129.212.183.227`
+- **API Port:** `3001`
+- **Process Manager:** PM2
+- **CI/CD:** GitHub Actions
 
-## 🔧 Server Setup (One-time)
+## Architecture
 
-### 1. Connect to your server
-
-```bash
-ssh root@your-server-ip
+```
+GitHub Push → GitHub Actions → SSH to Server → Build → PM2 Restart
 ```
 
-### 2. Run the setup script
+Every push to `main` automatically deploys to production.
+
+---
+
+## Initial Server Setup (One-Time)
+
+### 1. Provision Server
+
+Create a DigitalOcean Droplet:
+
+- Ubuntu 22.04 LTS
+- Basic plan ($6/month minimum)
+- SSH key authentication
+
+### 2. Setup SSH Access
 
 ```bash
-# Download and run the setup script
-curl -fsSL https://raw.githubusercontent.com/yourusername/your-repo/main/scripts/setup-server.sh | bash
+# On your local machine
+ssh-keygen -t ed25519 -C "deployment@newsbrief"
+
+# Copy public key to server
+ssh-copy-id root@129.212.183.227
+
+# Test connection
+ssh root@129.212.183.227
 ```
 
-### 3. Configure your environment
+### 3. Install Dependencies on Server
 
 ```bash
-# Edit the .env file with your actual values
-nano /home/$USER/news-briefing-app/.env
+# SSH into server
+ssh root@129.212.183.227
+
+# Install Node.js 20
+curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+apt-get install -y nodejs
+
+# Install PM2
+npm install -g pm2
+
+# Install Git
+apt-get install -y git
+
+# Create application directory
+mkdir -p /root/POOSD
+cd /root/POOSD
+
+# Clone repository
+git clone <your-repo-url> POOSD-LargeProject_Team12
+cd POOSD-LargeProject_Team12
 ```
 
-### 4. Clone your repository
+### 4. Configure Environment
 
 ```bash
-cd /home/$USER/news-briefing-app
-git clone https://github.com/yourusername/your-repo.git .
-```
+cd /root/POOSD/POOSD-LargeProject_Team12/backend
 
-### 5. Install dependencies and start the app
+# Create .env file
+cat > .env << EOF
+PORT=3001
+NODE_ENV=production
+FRONTEND_URL=http://localhost:3000
+JWT_SECRET=your-production-secret-here
+JWT_EXPIRES_IN=7d
+MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/news-briefing
+RATE_LIMIT_WINDOW_MS=900000
+RATE_LIMIT_MAX_REQUESTS=100
+EOF
 
-```bash
-cd backend
+# Install dependencies and build
 npm install
 npm run build
-pm2 start dist/index.js --name news-briefing-api
+
+# Start with PM2
+pm2 start dist/backend/src/index.js --name news-briefing-api
 pm2 save
-pm2 startup  # Follow the instructions to enable auto-start
+pm2 startup
 ```
 
-## 🔐 GitHub Secrets Configuration
-
-In your GitHub repository, go to **Settings > Secrets and variables > Actions** and add:
-
-| Secret Name      | Description                       | Example                                  |
-| ---------------- | --------------------------------- | ---------------------------------------- |
-| `SERVER_HOST`    | Your server IP address            | `123.456.789.0`                          |
-| `SERVER_USER`    | SSH username                      | `root` or `ubuntu`                       |
-| `SERVER_SSH_KEY` | Private SSH key for server access | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-
-### How to get your SSH key:
+### 5. Test Deployment
 
 ```bash
-# On your local machine, generate SSH key if you don't have one
-ssh-keygen -t ed25519 -C "your-email@example.com"
+# Health check
+curl http://129.212.183.227:3001/health
+```
 
-# Copy the public key to your server
-ssh-copy-id -i ~/.ssh/id_ed25519.pub root@your-server-ip
+---
 
-# Copy the private key content for GitHub secrets
+## GitHub Actions Setup
+
+### 1. Configure Repository Secrets
+
+In your GitHub repository, go to **Settings → Secrets and variables → Actions** and add:
+
+| Secret Name      | Value             | Description             |
+| ---------------- | ----------------- | ----------------------- |
+| `SERVER_HOST`    | `129.212.183.227` | DigitalOcean server IP  |
+| `SERVER_USER`    | `root`            | SSH username            |
+| `SERVER_SSH_KEY` | `<private-key>`   | SSH private key content |
+
+**To get SSH private key:**
+
+```bash
 cat ~/.ssh/id_ed25519
 ```
 
-## 🚀 How Deployment Works
+Copy the entire output including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`
 
-### Development Workflow:
+### 2. Workflow Configuration
 
-1. **Develop locally** on your feature branch
-2. **Test locally** with `npm run dev`
-3. **Push to GitHub** - creates a pull request
-4. **Merge to main** - triggers automatic deployment
-5. **GitHub Actions** automatically deploys to your server
+The workflow is defined in `.github/workflows/deploy.yml`:
 
-### What happens during deployment:
+```yaml
+name: Deploy to Server
 
-1. GitHub Actions checks out your code
-2. Installs dependencies
-3. Builds the application
-4. Connects to your server via SSH
-5. Pulls latest changes
-6. Installs production dependencies
-7. Builds the application
-8. Restarts the app with PM2
+on:
+  push:
+    branches: [main]
 
-## 📊 Monitoring
-
-### Check application status:
-
-```bash
-pm2 status
-pm2 logs news-briefing-api
-pm2 monit
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - Checkout code
+      - Setup Node.js 20
+      - Install dependencies
+      - Build application
+      - SSH to server
+      - Pull latest code
+      - Install dependencies
+      - Build on server
+      - Restart PM2
 ```
 
-### View deployment logs:
+**Workflow triggers on:**
 
-- Go to your GitHub repository
-- Click on **Actions** tab
-- Click on the latest deployment run
-- View the logs for any issues
+- Every push to `main` branch
+- Manual trigger via GitHub UI (workflow_dispatch)
 
-## 🔄 Manual Deployment
+---
+
+## Deployment Process
+
+### Automatic Deployment
+
+1. Commit and push changes to `main`:
+
+   ```bash
+   git add .
+   git commit -m "Your changes"
+   git push origin main
+   ```
+
+2. GitHub Actions automatically:
+
+   - Builds the application
+   - SSHs to the server
+   - Pulls latest code
+   - Rebuilds on server
+   - Restarts PM2
+
+3. Monitor deployment:
+   - Go to **Actions** tab in GitHub
+   - Click on the latest workflow run
+   - View logs for each step
+
+### Manual Deployment
 
 If you need to deploy manually:
 
 ```bash
-# On your server
-cd /home/$USER/news-briefing-app
-./scripts/deploy.sh
+# SSH to server
+ssh root@129.212.183.227
+
+# Navigate to project
+cd /root/POOSD/POOSD-LargeProject_Team12
+
+# Pull latest changes
+git pull origin main
+
+# Build and restart
+cd backend
+npm install
+npm run build
+pm2 restart news-briefing-api
 ```
 
-## 🛠️ Troubleshooting
+---
 
-### Common issues:
+## Monitoring
 
-1. **SSH connection fails**
-
-   - Check your SSH key is correct in GitHub secrets
-   - Verify server IP and username
-   - Test SSH connection manually
-
-2. **Build fails**
-
-   - Check Node.js version on server (should be 20+)
-   - Verify all dependencies are installed
-   - Check for TypeScript compilation errors
-
-3. **PM2 issues**
-   - Check PM2 is installed: `pm2 --version`
-   - Restart PM2: `pm2 restart news-briefing-api`
-   - Check logs: `pm2 logs news-briefing-api`
-
-### Health check:
+### Check Application Status
 
 ```bash
-# Test if your app is running
+# SSH to server
+ssh root@129.212.183.227
+
+# Check PM2 status
+pm2 status
+
+# View logs
+pm2 logs news-briefing-api
+
+# Real-time monitoring
+pm2 monit
+```
+
+### Check API Health
+
+```bash
+# From anywhere
 curl http://129.212.183.227:3001/health
 ```
 
-## 📝 Environment Variables
+Expected response:
 
-Make sure these are set in your server's `.env` file:
-
-```bash
-# Server Configuration
-PORT=3001
-NODE_ENV=production
-
-# Frontend URL for CORS (update with your actual domain)
-FRONTEND_URL=https://your-domain.com
-
-# JWT Configuration
-JWT_SECRET=your-jwt-secret-here
-JWT_EXPIRES_IN=7d
-
-# Rate Limiting
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-
-# Database Configuration
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/news-briefing?retryWrites=true&w=majority&appName=Main
-
-# Quota Configuration
-DAILY_QUOTA_LIMIT=10
-MONTHLY_QUOTA_LIMIT=100
-
-# Production-specific settings
-API_BASE_URL=129.212.183.227
-
-# External APIs (add your actual keys)
-OPENAI_API_KEY=sk-...
-NEWS_API_KEY=your-news-api-key
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=your-resend-key
+```json
+{
+  "status": "ok",
+  "version": "1.0.3",
+  "environment": "production",
+  "timestamp": "2025-10-23T12:00:00.000Z"
+}
 ```
 
-## 🎯 Next Steps
+### PM2 Commands
 
-1. Set up your server using the setup script
-2. Configure GitHub secrets
-3. Push your code to trigger the first deployment
-4. Monitor the deployment in GitHub Actions
-5. Test your deployed application
+```bash
+# View status
+pm2 status
 
-Your automated deployment pipeline is now ready! 🎉
+# View logs
+pm2 logs news-briefing-api
+pm2 logs news-briefing-api --lines 100
+
+# Restart
+pm2 restart news-briefing-api
+
+# Stop
+pm2 stop news-briefing-api
+
+# Delete from PM2
+pm2 delete news-briefing-api
+
+# Save PM2 process list
+pm2 save
+```
+
+---
+
+## Troubleshooting
+
+### Deployment Failed
+
+**Check GitHub Actions logs:**
+
+1. Go to **Actions** tab
+2. Click failed workflow
+3. Expand failing step to see error
+
+**Common issues:**
+
+**SSH connection failed:**
+
+- Verify `SERVER_SSH_KEY` secret is correct
+- Test SSH manually: `ssh root@129.212.183.227`
+- Check server is running
+
+**Build failed:**
+
+- Check for TypeScript errors locally first
+- Run `npm run build` locally to test
+- Check Node.js version (needs 20+)
+
+**PM2 restart failed:**
+
+- SSH to server and check logs: `pm2 logs`
+- Manually restart: `pm2 restart news-briefing-api`
+- If process doesn't exist: `pm2 start dist/backend/src/index.js --name news-briefing-api`
+
+### Application Not Starting
+
+```bash
+# SSH to server
+ssh root@129.212.183.227
+
+# Check PM2 logs
+pm2 logs news-briefing-api --lines 50
+
+# Common issues:
+# 1. MongoDB connection failed - check MONGODB_URI in .env
+# 2. Port already in use - check PORT in .env
+# 3. Missing environment variables - verify .env file
+```
+
+### API Returns Errors
+
+```bash
+# Check server logs
+pm2 logs news-briefing-api
+
+# Check MongoDB connection
+# Look for "MongoDB connected successfully" in logs
+
+# Restart application
+pm2 restart news-briefing-api
+```
+
+### Environment Variables
+
+```bash
+# View current environment on server
+ssh root@129.212.183.227
+cd /root/POOSD/POOSD-LargeProject_Team12/backend
+cat .env
+
+# Update environment
+nano .env
+# Make changes, then restart:
+pm2 restart news-briefing-api
+```
+
+---
+
+## Rollback
+
+To rollback to a previous version:
+
+```bash
+# SSH to server
+ssh root@129.212.183.227
+cd /root/POOSD/POOSD-LargeProject_Team12
+
+# Find commit hash to rollback to
+git log --oneline -n 10
+
+# Checkout previous commit
+git checkout <commit-hash>
+
+# Rebuild and restart
+cd backend
+npm install
+npm run build
+pm2 restart news-briefing-api
+```
+
+---
+
+## Security Best Practices
+
+1. **Never commit `.env` files**
+
+   - Use `.env.example` for templates
+   - Store secrets in GitHub Secrets
+
+2. **Rotate SSH keys** regularly
+
+   - Update `SERVER_SSH_KEY` secret when rotating
+
+3. **Use strong JWT secrets**
+
+   - Generate with: `openssl rand -base64 64`
+
+4. **Keep dependencies updated**
+
+   - Run `npm audit` regularly
+   - Update vulnerable packages
+
+5. **Monitor logs** for suspicious activity
+   - Check `pm2 logs` regularly
+   - Set up alerts for errors
+
+---
+
+## Production Checklist
+
+Before deploying to production:
+
+- [ ] `.env` has production values (MongoDB URI, JWT secret)
+- [ ] MongoDB Atlas IP whitelist includes server IP
+- [ ] GitHub Secrets are configured correctly
+- [ ] SSH key is properly set up
+- [ ] PM2 is running and configured for auto-restart
+- [ ] Server has adequate resources (RAM, disk space)
+- [ ] Health endpoint returns 200 OK
+- [ ] Test all API endpoints manually
+
+---
+
+## Support
+
+**API not responding:**
+
+- Check health: `curl http://129.212.183.227:3001/health`
+- Check PM2: `pm2 status`
+- Check logs: `pm2 logs`
+
+**Deployment failing:**
+
+- Check GitHub Actions logs
+- Test build locally: `npm run build`
+- Verify SSH access: `ssh root@129.212.183.227`
+
+**Need to update environment:**
+
+- SSH to server
+- Edit `/root/POOSD/POOSD-LargeProject_Team12/backend/.env`
+- Restart: `pm2 restart news-briefing-api`

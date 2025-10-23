@@ -1,192 +1,318 @@
-# 🔒 Security Guide
+# Security Guide
 
-## ⚠️ CREDENTIAL EXPOSURE INCIDENT
+Security best practices and guidelines for the News Briefing application.
 
-**Date**: October 22, 2025  
-**Issue**: MongoDB URI and JWT secret were accidentally committed to the repository  
-**Status**: ✅ RESOLVED
+## 🔐 Credential Management
 
-## 🚨 Immediate Actions Taken
+### Development
 
-1. **✅ Removed credentials** from all documentation files
-2. **✅ Added .gitignore** to prevent future credential commits
-3. **✅ Created .env.example** for secure credential management
-4. **✅ Updated deployment scripts** with placeholder values
+**Never commit sensitive credentials:**
 
-## 🔧 What Was Exposed
-
-- **MongoDB URI**: `mongodb+srv://root:root@main.amakhgx.mongodb.net/...`
-- **JWT Secret**: `33333bf9a79f0b4f40068983210508e3e76416b47c867a8b166df1aa6fbfa9813e9c15c892fc38d0c32db80c2a7371390fa1e465f5a5c4b2bfc9d4731de6edf6`
-
-## 🛡️ Security Measures Implemented
-
-### 1. Credential Removal
-
-- Replaced real credentials with placeholders in all files
-- Updated documentation to use secure examples
-- Added proper .gitignore to prevent future exposure
-
-### 2. Secure Development Practices
-
-- **Never commit .env files** - they're now in .gitignore
-- **Use .env.example** for sharing environment variable structure
-- **Store real credentials** in GitHub Secrets for deployment
-- **Use environment variables** in production
-
-### 3. Git History Cleanup
-
-If you need to completely remove credentials from Git history:
+- Use `.env` files (already in `.gitignore`)
+- Use `backend/.env.example` as a template
+- Store real values only in local `.env` file
 
 ```bash
-# Run the cleanup script (WARNING: Rewrites history)
-./scripts/clean-git-history.sh
-
-# Or manually with git filter-branch
-git filter-branch --force --index-filter \
-'git rm --cached --ignore-unmatch scripts/setup-server.sh DEPLOYMENT.md' \
---prune-empty --tag-name-filter cat -- --all
-```
-
-## 🔐 Secure Credential Management
-
-### For Development:
-
-```bash
-# Copy the example file
+# Setup local environment
+cd backend
 cp .env.example .env
-
-# Edit with your real credentials (NEVER commit this file)
-nano .env
+nano .env  # Edit with your credentials
 ```
 
-### For Production:
+### Production
 
-1. **GitHub Secrets** (for automated deployment):
+**Store secrets securely:**
 
-   - `MONGODB_URI`
-   - `JWT_SECRET`
-   - `OPENAI_API_KEY`
-   - `NEWS_API_KEY`
-   - `RESEND_API_KEY`
-
-2. **Server Environment** (for manual deployment):
-   ```bash
-   # On your server, create .env with real values
-   nano /home/user/news-briefing-app/.env
-   ```
-
-## 🚨 If Credentials Are Exposed Again
-
-### Immediate Response:
-
-1. **Change the credentials immediately**
-
-   - Change MongoDB password
-   - Generate new JWT secret
-   - Rotate API keys if possible
-
-2. **Remove from repository**
+1. **On Server:**
 
    ```bash
-   git rm --cached .env
-   git commit -m "Remove exposed credentials"
+   # SSH to server
+   ssh root@129.212.183.227
+   cd /root/POOSD/POOSD-LargeProject_Team12/backend
+   nano .env  # Add production credentials
    ```
 
-3. **Clean Git history** (if needed)
+2. **In GitHub Secrets:**
+   - Go to repository Settings → Secrets → Actions
+   - Add: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`
+   - Never log secrets in Actions workflows
 
-   ```bash
-   ./scripts/clean-git-history.sh
-   ```
+### Required Secrets
 
-4. **Force push** (coordinate with team)
-   ```bash
-   git push --force-with-lease origin main
-   ```
+**Development:**
 
-## 📋 Security Checklist
+- `MONGODB_URI` - Database connection
+- `JWT_SECRET` - Token signing key
 
-### ✅ Before Committing:
+**Production (additional):**
 
-- [ ] No `.env` files in staging area
-- [ ] No hardcoded credentials in code
-- [ ] No API keys in comments
-- [ ] No database URLs in documentation
-- [ ] All sensitive data in environment variables
+- Strong `JWT_SECRET` (64+ character random string)
+- MongoDB Atlas with IP whitelisting
+- Strong database password
 
-### ✅ For Deployment:
+**Future:**
 
-- [ ] Use GitHub Secrets for CI/CD
-- [ ] Use server environment variables for production
-- [ ] Never log credentials
-- [ ] Use secure credential management tools
-
-## 🔍 Monitoring
-
-### Check for Exposed Credentials:
-
-```bash
-# Search for potential credential patterns
-grep -r "mongodb+srv://" . --exclude-dir=node_modules
-grep -r "sk-" . --exclude-dir=node_modules
-grep -r "password" . --exclude-dir=node_modules
-```
-
-### Regular Security Audits:
-
-- Review commits before pushing
-- Use tools like `git-secrets` to prevent credential commits
-- Regular credential rotation
-- Monitor for exposed credentials in public repos
-
-## 📚 Best Practices
-
-### 1. Environment Variables
-
-```bash
-# ✅ Good
-const mongoUri = process.env.MONGODB_URI;
-
-# ❌ Bad
-const mongoUri = "mongodb+srv://user:pass@cluster.net/db";
-```
-
-### 2. Documentation
-
-```bash
-# ✅ Good
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
-
-# ❌ Bad
-MONGODB_URI=mongodb+srv://root:root@main.amakhgx.mongodb.net/news-briefing
-```
-
-### 3. Git Practices
-
-```bash
-# ✅ Good
-git add .env.example
-git commit -m "Add environment template"
-
-# ❌ Bad
-git add .env
-git commit -m "Add environment variables"
-```
-
-## 🆘 Emergency Contacts
-
-If credentials are exposed:
-
-1. **Immediately change** all exposed credentials
-2. **Notify team** about the exposure
-3. **Review access logs** for unauthorized access
-4. **Update security measures** to prevent recurrence
-
-## 📖 Additional Resources
-
-- [GitHub Security Best Practices](https://docs.github.com/en/code-security)
-- [Environment Variables Security](https://12factor.net/config)
-- [Git Secrets Prevention](https://github.com/awslabs/git-secrets)
+- `OPENAI_API_KEY`
+- `NEWS_API_KEY`
+- `RESEND_API_KEY`
 
 ---
 
-**Remember**: Security is everyone's responsibility. When in doubt, ask before committing sensitive data!
+## 🛡️ Authentication Security
+
+### OTP System
+
+**Current implementation:**
+
+- 6-digit random codes
+- Bcrypt hashing (10 rounds)
+- 10-minute expiration
+- Maximum 5 attempts
+- Rate limiting per IP
+
+**Best practices:**
+
+- OTPs are single-use
+- Throttle after failed attempts
+- Monitor for brute force attacks
+
+### JWT Tokens
+
+**Configuration:**
+
+- 7-day expiration (configurable)
+- HS256 algorithm
+- Signed with `JWT_SECRET`
+
+**Security measures:**
+
+- Never expose `JWT_SECRET`
+- Rotate secrets periodically
+- Use strong random secrets (64+ chars)
+- Tokens are stateless (no server session)
+
+**Generate strong secret:**
+
+```bash
+openssl rand -base64 64
+```
+
+---
+
+## 🚨 Rate Limiting
+
+**Current limits:**
+
+- Per-IP: 100 requests / 15 minutes
+- Per-User: 200 requests / 15 minutes
+- Briefing generation: 3 / day
+
+**Customize in `.env`:**
+
+```bash
+RATE_LIMIT_WINDOW_MS=900000     # 15 minutes
+RATE_LIMIT_MAX_REQUESTS=100
+DAILY_QUOTA_LIMIT=3
+```
+
+---
+
+## 🔒 Security Headers
+
+Implemented via Helmet middleware:
+
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Strict-Transport-Security` (HTTPS)
+
+**CORS configured for:**
+
+- Development: `http://localhost:3000`
+- Production: Configure `FRONTEND_URL` in `.env`
+
+---
+
+## 📋 Security Checklist
+
+### Before Committing
+
+- [ ] No `.env` files staged
+- [ ] No hardcoded credentials
+- [ ] No API keys in code
+- [ ] No database URLs in comments
+- [ ] Sensitive data in environment variables only
+
+### Before Deploying
+
+- [ ] Strong `JWT_SECRET` set (64+ chars)
+- [ ] MongoDB Atlas IP whitelist configured
+- [ ] Strong database password
+- [ ] GitHub Secrets properly configured
+- [ ] `.env` file on server has production values
+- [ ] SSH keys are secure and rotated
+
+### Regular Maintenance
+
+- [ ] Rotate `JWT_SECRET` periodically (invalidates all tokens)
+- [ ] Update dependencies (`npm audit`)
+- [ ] Monitor rate limiting alerts
+- [ ] Review server logs for suspicious activity
+- [ ] Rotate SSH keys every 90 days
+
+---
+
+## 🚫 What NOT to Do
+
+❌ **Never:**
+
+- Commit `.env` files
+- Hardcode credentials in code
+- Log sensitive data (passwords, tokens, secrets)
+- Expose secrets in error messages
+- Share credentials via chat/email
+- Use weak JWT secrets (`"secret"`, `"123456"`)
+- Disable security middleware in production
+
+✅ **Always:**
+
+- Use environment variables for secrets
+- Use `.env.example` for templates
+- Rotate credentials after exposure
+- Use strong random secrets
+- Enable all security middleware
+- Keep dependencies updated
+
+---
+
+## 🔍 Checking for Exposed Credentials
+
+```bash
+# Search for potential credential patterns
+grep -r "mongodb+srv://" . --exclude-dir=node_modules --exclude-dir=.git
+grep -r "JWT_SECRET" . --exclude-dir=node_modules --exclude-dir=.git
+grep -r "sk-" . --exclude-dir=node_modules --exclude-dir=.git
+```
+
+**Use tools:**
+
+- `git-secrets` - Prevent credential commits
+- `npm audit` - Check for vulnerabilities
+- GitHub secret scanning (automatic)
+
+---
+
+## 🆘 If Credentials Are Exposed
+
+### Immediate Actions
+
+1. **Change credentials immediately:**
+
+   - Rotate MongoDB password
+   - Generate new `JWT_SECRET` (invalidates all tokens)
+   - Rotate API keys
+
+2. **Update everywhere:**
+
+   - Server `.env` file
+   - GitHub Secrets
+   - Local development `.env`
+
+3. **Restart application:**
+
+   ```bash
+   pm2 restart news-briefing-api
+   ```
+
+4. **Notify team** if credentials were public
+
+### Prevent Future Exposure
+
+- Review `.gitignore` includes `.env`
+- Setup `git-secrets` pre-commit hooks
+- Enable GitHub secret scanning alerts
+- Regular security audits
+
+---
+
+## 📚 Best Practices Summary
+
+### Environment Variables
+
+✅ **Good:**
+
+```typescript
+const secret = process.env.JWT_SECRET;
+const dbUri = process.env.MONGODB_URI;
+```
+
+❌ **Bad:**
+
+```typescript
+const secret = "my-secret-key";
+const dbUri = "mongodb+srv://user:pass@...";
+```
+
+### Documentation
+
+✅ **Good:**
+
+```bash
+# .env.example
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/database
+JWT_SECRET=your-secret-key-here
+```
+
+❌ **Bad:**
+
+```bash
+# Documentation or README - NEVER include real credentials
+MONGODB_URI=mongodb+srv://realuser:realpass@cluster.mongodb.net/database
+JWT_SECRET=actual-secret-key-do-not-commit
+```
+
+### Git Practices
+
+✅ **Good:**
+
+```bash
+git add backend/.env.example
+git add backend/src/
+git commit -m "Add environment template"
+```
+
+❌ **Bad:**
+
+```bash
+git add backend/.env
+git commit -m "Add configuration"
+```
+
+---
+
+## 📖 Resources
+
+- [OWASP Top 10](https://owasp.org/www-project-top-ten/)
+- [MongoDB Security Checklist](https://docs.mongodb.com/manual/administration/security-checklist/)
+- [JWT Best Practices](https://tools.ietf.org/html/rfc8725)
+- [GitHub Secret Scanning](https://docs.github.com/en/code-security/secret-scanning)
+
+---
+
+## 🆘 Questions?
+
+**Security concerns:**
+
+- Review this guide
+- Check server logs for anomalies
+- Test authentication flow
+- Verify rate limiting is working
+
+**Need help:**
+
+1. Check documentation in this repo
+2. Review error messages and logs
+3. Verify environment configuration
+4. Test endpoints with curl
+
+**Remember:** Security is everyone's responsibility. When in doubt, ask before committing or deploying!

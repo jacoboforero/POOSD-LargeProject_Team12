@@ -1,52 +1,55 @@
-# 📡 News Briefing API Documentation
+# API Documentation
 
-Complete API reference for the News Briefing Backend service.
+Complete REST API reference for the News Briefing backend.
 
-## 🌐 **Base URL**
+## Base URLs
+
+- **Local Development:** `http://localhost:3001`
+- **Production:** `http://129.212.183.227:3001`
+
+## Authentication
+
+Most endpoints require a JWT token obtained through OTP verification.
+
+**Headers:**
 
 ```
-http://localhost:3001
+Authorization: Bearer <your-jwt-token>
+Content-Type: application/json
 ```
-
-## 🔐 **Authentication**
-
-The API uses JWT (JSON Web Token) authentication. Get a token by completing the OTP verification flow.
-
-### **Authentication Flow**
-
-1. Request OTP with email
-2. Verify OTP with code
-3. Receive JWT token
-4. Use token in `Authorization: Bearer <token>` header
 
 ---
 
-## 📋 **API Endpoints**
+## Endpoints
 
-### **1. Health Check**
+### Health Check
 
 **GET** `/health`
 
-Check server status and timestamp.
+Check server status.
 
 **Response:**
 
 ```json
 {
   "status": "ok",
-  "timestamp": "2025-10-22T22:40:34.603Z"
+  "version": "1.0.3",
+  "environment": "development",
+  "timestamp": "2025-10-23T12:00:00.000Z"
 }
 ```
 
 ---
 
-### **2. Request OTP**
+### Authentication
+
+#### Request OTP
 
 **POST** `/api/auth/otp/request`
 
 Request a one-time password for authentication.
 
-**Request Body:**
+**Request:**
 
 ```json
 {
@@ -62,17 +65,17 @@ Request a one-time password for authentication.
 }
 ```
 
-**Note:** In dummy mode, any email works and OTP is always `123456`.
+**Note:** OTP is logged to server console. Check server logs for the 6-digit code. OTP expires in 10 minutes.
 
 ---
 
-### **3. Verify OTP**
+#### Verify OTP
 
 **POST** `/api/auth/otp/verify`
 
-Verify OTP code and receive JWT token.
+Verify OTP and receive JWT token.
 
-**Request Body:**
+**Request:**
 
 ```json
 {
@@ -85,119 +88,103 @@ Verify OTP code and receive JWT token.
 
 ```json
 {
-  "token": "mock-jwt-token",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
   "user": {
-    "_id": "mock-user-id",
+    "_id": "6718a5c3f4e2b3a1d8e9f012",
     "email": "user@example.com",
     "emailVerified": true,
     "preferences": {
       "topics": [],
-      "interests": [],
-      "jobIndustry": "",
-      "demographic": ""
+      "interests": []
     },
     "timezone": "UTC",
     "notificationPrefs": {
-      "email": true,
-      "push": false,
-      "frequency": "daily"
+      "onBriefingReady": true
     },
-    "createdAt": "2025-10-22T22:40:43.520Z",
-    "updatedAt": "2025-10-22T22:40:43.520Z"
+    "createdAt": "2025-10-23T12:00:00.000Z",
+    "updatedAt": "2025-10-23T12:00:00.000Z"
   }
 }
 ```
 
 ---
 
-### **4. Get User Profile**
+### User Management
 
-**GET** `/api/me`
+#### Get Current User
 
-Get current user's profile information.
+**GET** `/api/me/me`
 
-**Headers:**
+Get current user's profile.
 
-```
-Authorization: Bearer <jwt-token>
-```
+**Headers:** Requires `Authorization: Bearer <token>`
 
 **Response:**
 
 ```json
 {
-  "_id": "mock-user-id",
+  "_id": "6718a5c3f4e2b3a1d8e9f012",
   "email": "user@example.com",
   "emailVerified": true,
   "preferences": {
-    "topics": [],
-    "interests": [],
-    "jobIndustry": "",
-    "demographic": ""
+    "topics": ["technology", "business"],
+    "interests": ["AI", "startups"],
+    "demographic": "professional",
+    "jobIndustry": "tech"
+  },
+  "limits": {
+    "dailyGenerateCap": 3,
+    "generatedCountToday": 1,
+    "resetAt": "2025-10-24T00:00:00.000Z"
   },
   "timezone": "UTC",
   "notificationPrefs": {
-    "email": true,
-    "push": false,
-    "frequency": "daily"
+    "onBriefingReady": true
   },
-  "createdAt": "2025-10-22T22:40:43.520Z",
-  "updatedAt": "2025-10-22T22:40:43.520Z"
+  "createdAt": "2025-10-23T12:00:00.000Z",
+  "updatedAt": "2025-10-23T12:00:00.000Z"
 }
 ```
 
 ---
 
-### **5. Get User Usage**
+#### Get User Usage
 
 **GET** `/api/me/usage`
 
-Get user's usage statistics and quota information.
+Get user's quota and usage statistics.
 
-**Headers:**
-
-```
-Authorization: Bearer <jwt-token>
-```
+**Headers:** Requires `Authorization: Bearer <token>`
 
 **Response:**
 
 ```json
 {
-  "totalBriefings": 5,
-  "completedBriefings": 3,
-  "queuedBriefings": 1,
-  "failedBriefings": 1,
-  "dailyUsage": 2,
-  "quota": {
-    "daily": 10,
-    "monthly": 100,
-    "remaining": 8
-  }
+  "dailyGenerateCap": 3,
+  "generatedCountToday": 1,
+  "remaining": 2,
+  "resetAt": "2025-10-24T00:00:00.000Z"
 }
 ```
 
 ---
 
-### **6. Generate Briefing**
+### Briefings
+
+#### Generate Briefing
 
 **POST** `/api/briefings/generate`
 
-Create a new personalized news briefing.
+Generate a new personalized news briefing.
 
-**Headers:**
+**Headers:** Requires `Authorization: Bearer <token>`
 
-```
-Authorization: Bearer <jwt-token>
-Content-Type: application/json
-```
-
-**Request Body:**
+**Request (optional - uses user preferences if not provided):**
 
 ```json
 {
-  "topics": ["technology", "AI", "machine learning"],
-  "interests": ["artificial intelligence", "data science"],
+  "topics": ["technology", "AI"],
+  "interests": ["machine learning", "startups"],
   "jobIndustry": "tech",
   "demographic": "professional"
 }
@@ -207,149 +194,137 @@ Content-Type: application/json
 
 ```json
 {
-  "briefingId": "eec102de-121b-4f9f-8747-7c7de2be1000"
+  "briefingId": "6718a5c3f4e2b3a1d8e9f013"
 }
 ```
 
-**Note:** Briefing processing takes ~2 seconds in dummy mode.
+**Note:** Processing happens in background. Poll status endpoint to check completion.
 
 ---
 
-### **7. Get Briefing Status**
+#### Get Briefing Status
 
-**GET** `/api/briefings/{briefingId}/status`
+**GET** `/api/briefings/:id/status`
 
-Check the processing status of a briefing.
+Check processing status of a briefing.
 
-**Headers:**
-
-```
-Authorization: Bearer <jwt-token>
-```
+**Headers:** Requires `Authorization: Bearer <token>`
 
 **Response:**
 
 ```json
 {
-  "_id": "eec102de-121b-4f9f-8747-7c7de2be1000",
+  "_id": "6718a5c3f4e2b3a1d8e9f013",
   "status": "done",
-  "createdAt": "2025-10-22T22:40:46.960Z",
-  "updatedAt": "2025-10-22T22:40:46.960Z"
+  "progress": 100,
+  "createdAt": "2025-10-23T12:00:00.000Z",
+  "updatedAt": "2025-10-23T12:00:03.000Z"
 }
 ```
 
-**Status Values:**
-
-- `queued` - Briefing is waiting to be processed
-- `processing` - Briefing is being generated
-- `done` - Briefing is complete
-- `failed` - Briefing generation failed
+**Status values:** `queued`, `fetching`, `summarizing`, `done`, `error`
 
 ---
 
-### **8. Get Briefing Details**
+#### Get Briefing
 
-**GET** `/api/briefings/{briefingId}`
+**GET** `/api/briefings/:id`
 
-Get the complete briefing with articles and summary.
+Get complete briefing with articles and summary.
 
-**Headers:**
-
-```
-Authorization: Bearer <jwt-token>
-```
+**Headers:** Requires `Authorization: Bearer <token>`
 
 **Response:**
 
 ```json
 {
-  "_id": "eec102de-121b-4f9f-8747-7c7de2be1000",
-  "userId": "mock-user-id",
+  "_id": "6718a5c3f4e2b3a1d8e9f013",
+  "userId": "6718a5c3f4e2b3a1d8e9f012",
   "status": "done",
-  "summary": "This is a comprehensive briefing covering the latest developments in technology and AI...",
+  "request": {
+    "topics": ["technology"],
+    "interests": ["AI"],
+    "jobIndustry": "tech",
+    "demographic": "professional",
+    "source": "news_api"
+  },
   "articles": [
     {
-      "title": "Breakthrough in Machine Learning",
-      "url": "https://example.com/article1",
-      "summary": "Researchers have made significant progress in neural network optimization...",
-      "publishedAt": "2025-10-22T20:00:00.000Z",
-      "source": "Tech News"
-    },
-    {
-      "title": "AI Ethics in Healthcare",
-      "url": "https://example.com/article2",
-      "summary": "New guidelines address ethical concerns in AI-powered medical devices...",
-      "publishedAt": "2025-10-22T18:30:00.000Z",
-      "source": "Health Tech"
+      "title": "Sample Article",
+      "url": "https://example.com/article",
+      "source": "Example News"
     }
   ],
-  "topics": ["technology", "AI"],
-  "interests": ["machine learning"],
-  "jobIndustry": "tech",
-  "demographic": "professional",
-  "createdAt": "2025-10-22T22:40:46.960Z",
-  "updatedAt": "2025-10-22T22:40:46.960Z"
+  "summary": {
+    "sections": [
+      {
+        "category": "technology",
+        "text": "This is a stub summary. Real news integration coming soon."
+      }
+    ],
+    "generatedAt": "2025-10-23T12:00:03.000Z",
+    "llm": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "inputTokens": 0,
+      "outputTokens": 0
+    }
+  },
+  "queuedAt": "2025-10-23T12:00:00.000Z",
+  "completedAt": "2025-10-23T12:00:03.000Z",
+  "progress": 100,
+  "createdAt": "2025-10-23T12:00:00.000Z",
+  "updatedAt": "2025-10-23T12:00:03.000Z"
 }
 ```
 
 ---
 
-## ❌ **Error Responses**
+## Error Responses
 
-All errors follow a consistent format:
+All errors follow this format:
 
 ```json
 {
   "error": {
     "code": "ERROR_CODE",
     "message": "Human-readable error message",
-    "details": [
-      {
-        "code": "validation_error",
-        "expected": "string",
-        "received": "number",
-        "path": ["email"],
-        "message": "Expected string, received number"
-      }
-    ]
+    "details": "Additional error details"
   }
 }
 ```
 
-### **Error Codes**
+### Error Codes
 
-| Code                | Description                              | HTTP Status |
-| ------------------- | ---------------------------------------- | ----------- |
-| `UNAUTHORIZED`      | Authentication required or invalid token | 401         |
-| `FORBIDDEN`         | Access denied                            | 403         |
-| `NOT_FOUND`         | Resource not found                       | 404         |
-| `RATE_LIMITED`      | Too many requests                        | 429         |
-| `QUOTA_EXCEEDED`    | Daily/monthly quota exceeded             | 429         |
-| `VALIDATION_FAILED` | Request validation failed                | 400         |
-| `PROVIDER_ERROR`    | External service error                   | 502         |
-| `INTERNAL_ERROR`    | Server error                             | 500         |
+| Code                | Status | Description              |
+| ------------------- | ------ | ------------------------ |
+| `UNAUTHORIZED`      | 401    | Invalid or missing token |
+| `FORBIDDEN`         | 403    | Access denied            |
+| `NOT_FOUND`         | 404    | Resource not found       |
+| `VALIDATION_FAILED` | 400    | Invalid request data     |
+| `RATE_LIMITED`      | 429    | Too many requests        |
+| `QUOTA_EXCEEDED`    | 402    | Daily quota exceeded     |
+| `INTERNAL_ERROR`    | 500    | Server error             |
 
 ---
 
-## 🔒 **Rate Limiting**
+## Rate Limiting
 
-- **Per-IP**: 100 requests per 15 minutes
-- **Per-User**: 200 requests per 15 minutes (authenticated users)
-- **Daily Quota**: 10 briefings per day (configurable)
+- **Per IP:** 100 requests per 15 minutes
+- **Per User:** 200 requests per 15 minutes
+- **Daily Briefings:** 3 per user (configurable)
 
-**Rate Limit Headers:**
+Rate limit headers included in responses:
 
 ```
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
-X-RateLimit-Reset: 1640995200
+X-RateLimit-Reset: 1729684800
 ```
 
 ---
 
-## 🧪 **Testing Examples**
-
-### **Complete Flow Example**
+## Complete Flow Example
 
 ```bash
 # 1. Health check
@@ -360,101 +335,63 @@ curl -X POST http://localhost:3001/api/auth/otp/request \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com"}'
 
-# 3. Verify OTP
+# 3. Check server logs for OTP, then verify
 curl -X POST http://localhost:3001/api/auth/otp/verify \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "code": "123456"}'
 
-# 4. Get user profile (use token from step 3)
-curl -X GET http://localhost:3001/api/me \
-  -H "Authorization: Bearer mock-jwt-token"
+# Save the token from response
 
-# 5. Generate briefing
+# 4. Get user profile
+curl http://localhost:3001/api/me/me \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# 5. Check usage
+curl http://localhost:3001/api/me/usage \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# 6. Generate briefing
 curl -X POST http://localhost:3001/api/briefings/generate \
-  -H "Authorization: Bearer mock-jwt-token" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -d '{"topics": ["technology"]}'
 
-# 6. Check briefing status (use briefingId from step 5)
-curl -X GET http://localhost:3001/api/briefings/{briefingId}/status \
-  -H "Authorization: Bearer mock-jwt-token"
+# Save briefingId from response
 
-# 7. Get briefing details
-curl -X GET http://localhost:3001/api/briefings/{briefingId} \
-  -H "Authorization: Bearer mock-jwt-token"
+# 7. Check status (poll until status = "done")
+curl http://localhost:3001/api/briefings/BRIEFING_ID/status \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+
+# 8. Get complete briefing
+curl http://localhost:3001/api/briefings/BRIEFING_ID \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
 ---
 
-## 📝 **Request/Response Examples**
+## Current Limitations
 
-### **Minimal Briefing Request**
+**⚠️ MVP Status - Dummy Data:**
 
-```json
-{
-  "topics": ["news"]
-}
-```
+- Articles and summaries are placeholder data
+- No real news API integration yet
+- No OpenAI integration yet
+- OTPs are logged to console (no email service yet)
 
-### **Full Briefing Request**
+**Coming Soon:**
 
-```json
-{
-  "topics": ["technology", "business", "science"],
-  "interests": ["AI", "startups", "research"],
-  "jobIndustry": "tech",
-  "demographic": "professional"
-}
-```
-
-### **User Preferences**
-
-```json
-{
-  "preferences": {
-    "topics": ["technology", "AI"],
-    "interests": ["machine learning"],
-    "jobIndustry": "tech",
-    "demographic": "professional"
-  }
-}
-```
+- Real news article fetching
+- AI-powered summarization
+- Email delivery for OTPs
+- Frontend web application
 
 ---
 
-## 🔧 **Development Notes**
+## Need Help?
 
-### **Dummy Data**
+1. **Check server logs** for detailed error messages
+2. **Verify JWT token** hasn't expired (7 day lifespan)
+3. **Check rate limits** if getting 429 errors
+4. **Ensure MongoDB** is connected (check `/health` endpoint)
 
-- **OTP Code**: Always `123456`
-- **JWT Token**: `mock-jwt-token`
-- **Processing Time**: ~2 seconds
-- **Storage**: In-memory (resets on restart)
-
-### **Production Considerations**
-
-- Replace dummy OTP with real email service
-- Replace in-memory storage with database
-- Implement real briefing generation
-- Add proper logging and monitoring
-
----
-
-## 📚 **Additional Resources**
-
-- **[Main README](./README.md)** - Quick start and overview
-- **[Testing Guide](./TESTING.md)** - Comprehensive testing instructions
-- **[Environment Setup](./.env.example)** - Environment configuration
-
----
-
-## 🆘 **Support**
-
-For issues or questions:
-
-1. Check server logs for error details
-2. Verify environment variables are set
-3. Test individual endpoints with curl
-4. Review this documentation for correct usage
-
-**Happy coding!** 🚀
+For deployment issues, see [DEPLOYMENT.md](../DEPLOYMENT.md).
