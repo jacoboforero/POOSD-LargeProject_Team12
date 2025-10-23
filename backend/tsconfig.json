@@ -4,19 +4,18 @@
     "module": "commonjs",
     "lib": ["ES2020"],
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "baseUrl": ".",
+    "baseUrl": "./src",
     "paths": {
-      "contracts": ["../packages/contracts/src/index.ts"],
-      "contracts/*": ["../packages/contracts/src/*"]
+      "contracts": ["../../packages/contracts/src/index.ts"],
+      "contracts/*": ["../../packages/contracts/src/*"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "../packages/**/*"]
+  "exclude": ["node_modules", "dist"]
 }
