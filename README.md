@@ -85,3 +85,4 @@ For detailed architecture information, API specifications, and implementation de
 ## License
 
 This project is part of a university course (POOSD - Principles of Object-Oriented Software Design).
+
