@@ -37,11 +37,11 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-           script: |
-             cd /root/POOSD/POOSD-LargeProject_Team12
-             git pull origin main
-             cd backend
-             npm ci
-             npm run build
-             pm2 restart news-briefing-api || pm2 start dist/index.js --name news-briefing-api
-             pm2 save
+          script: |
+            cd /root/POOSD/POOSD-LargeProject_Team12
+            git pull origin main
+            cd backend
+            npm ci
+            npm run build
+            pm2 restart news-briefing-api || pm2 start dist/index.js --name news-briefing-api
+            pm2 save
