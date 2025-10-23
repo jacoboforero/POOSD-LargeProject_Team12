@@ -42,6 +42,8 @@ jobs:
             set -e
             echo "=== Starting deployment ==="
             cd /root/POOSD/POOSD-LargeProject_Team12
+            echo "=== Stashing local changes (if any) ==="
+            git stash
             echo "=== Pulling latest code ==="
             git pull origin main
             cd backend
