@@ -27,26 +27,28 @@ cp .env.example .env
 npm run dev
 ```
 
-Backend runs at `http://localhost:3001`
+Backend runs at `http://localhost:3002` (local dev)
+
+**Note:** Production server uses port 3001 at `http://129.212.183.227:3001`
 
 ### Test the API
 
 ```bash
 # Health check
-curl http://localhost:3001/health
+curl http://localhost:3002/health
 
 # Register new user
-curl -X POST http://localhost:3001/api/auth/register \
+curl -X POST http://localhost:3002/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com"}'
 
 # Check server logs for OTP code, then verify
-curl -X POST http://localhost:3001/api/auth/verify \
+curl -X POST http://localhost:3002/api/auth/verify \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com", "code": "YOUR_OTP"}'
 
 # Login existing user (returns new OTP)
-curl -X POST http://localhost:3001/api/auth/login \
+curl -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com"}'
 ```
@@ -108,7 +110,7 @@ Required for backend (see `backend/.env.example`):
 
 - `MONGODB_URI` - MongoDB connection string
 - `JWT_SECRET` - Secret for JWT signing
-- `PORT` - Server port (default: 3001)
+- `PORT` - Server port (default: 3002 for local dev, 3001 for production)
 
 Future integration:
 
@@ -143,8 +145,8 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for setup instructions.
 
 **API returns 404:**
 
-- Verify server is running: `curl http://localhost:3001/health`
-- Check correct port (3001 for backend)
+- Verify server is running: `curl http://localhost:3002/health` (local)
+- Check correct port (3002 for local dev, 3001 for production)
 
 ## 👥 Team
 
