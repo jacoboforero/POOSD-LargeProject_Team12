@@ -47,7 +47,7 @@ app.get("/health", (req, res) => {
     status: "ok",
     version: "1.0.4",
     environment: process.env.NODE_ENV || "development",
-    message: "Deployment pipeline test - docs overhaul complete!",
+    message: "Deployment pipeline test - successful!",
     timestamp: new Date().toISOString(),
   });
 });
