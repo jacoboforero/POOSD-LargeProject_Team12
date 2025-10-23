@@ -45,9 +45,9 @@ app.use(ipRateLimit);
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    version: "1.0.3",
+    version: "1.0.4",
     environment: process.env.NODE_ENV || "development",
-    message: "CI/CD is working!",
+    message: "Deployment pipeline test - docs overhaul complete!",
     timestamp: new Date().toISOString(),
   });
 });
