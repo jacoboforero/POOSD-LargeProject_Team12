@@ -52,14 +52,14 @@ jobs:
             set -e
             echo "=== Starting deployment ==="
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
-            
+
             echo "=== Verify .env exists ==="
             if [ ! -f .env ]; then
               echo "❌ ERROR: No .env file! Deployment cannot continue."
               echo "Please create backend/.env on the server with production values!"
               exit 1
             fi
-            
+
             echo "=== Installing production dependencies ==="
             npm ci --omit=dev
 
