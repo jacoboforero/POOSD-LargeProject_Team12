@@ -1,17 +1,30 @@
 import React, { useState } from 'react';
 
-function Login({ onNavigateToRegister }: { onNavigateToRegister?: () => void }) {
+interface LoginProps {
+  onNavigateToRegister?: () => void;
+  onLogin?: (username: string) => void;
+  successMessage?: string;
+}
+
+const Login = ({ onNavigateToRegister, onLogin, successMessage }: LoginProps) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Logged in:', username);
+    if (onLogin) onLogin(username);
   };
 
   return (
     <div className="auth-box">
       <h2 className="auth-heading">Welcome Back</h2>
+
+      {successMessage && (
+        <p style={{ color: '#dff0d8', textAlign: 'center', marginBottom: '1rem' }}>
+          {successMessage}
+        </p>
+      )}
+
       <form className="auth-form" onSubmit={handleSubmit}>
         <input
           className="auth-input"
@@ -37,6 +50,6 @@ function Login({ onNavigateToRegister }: { onNavigateToRegister?: () => void }) 
       </p>
     </div>
   );
-}
+};
 
 export default Login;

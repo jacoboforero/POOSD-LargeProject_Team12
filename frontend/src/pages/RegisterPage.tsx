@@ -3,14 +3,11 @@ import Register from '../components/Register';
 
 interface Props {
   onNavigateToLogin?: () => void;
+  onRegister?: (username: string) => void;
 }
 
-const RegisterPage = ({ onNavigateToLogin }: Props) => {
-  return (
-    <div className="auth-page">
-      <Register onNavigateToLogin={onNavigateToLogin ?? (() => {})} />
-    </div>
-  );
+const RegisterPage = ({ onNavigateToLogin, onRegister }: Props) => {
+  return <Register onNavigateToLogin={onNavigateToLogin} onRegister={onRegister} />;
 };
 
 export default RegisterPage;
