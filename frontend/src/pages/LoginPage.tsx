@@ -1,12 +1,16 @@
-import PageTitle from '../components/PageTitle.tsx';
-import Login from '../components/Login.tsx';
+import React from 'react';
+import Login from '../components/Login';
 
-const LoginPage = () => {
-    return (
-        <div>
-            <PageTitle />
-            <Login />
-        </div>
-    );
+interface Props {
+  onNavigateToRegister?: () => void;
+}
+
+const LoginPage = ({ onNavigateToRegister }: Props) => {
+  return (
+    <div className="auth-page">
+      <Login onNavigateToRegister={onNavigateToRegister ?? (() => {})} />
+    </div>
+  );
 };
+
 export default LoginPage;

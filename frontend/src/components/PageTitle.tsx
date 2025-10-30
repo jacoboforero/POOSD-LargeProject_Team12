@@ -1,7 +1,11 @@
+import '../App.css';
+
 function PageTitle() {
-    return (
-        <h1 id="title"> WEBSITE TITLE </h1>
-    );
-};
+  return (
+    <div className="page-header">
+      <h1 className="page-title">IntelliBrief</h1>
+    </div>
+  );
+}
 
 export default PageTitle;
