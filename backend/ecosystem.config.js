@@ -5,7 +5,7 @@ module.exports = {
       script: "/root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js",
       cwd: "/root/POOSD/POOSD-LargeProject_Team12/backend",
       env: {
-        NODE_PATH: "/root/POOSD/POOSD-LargeProject_Team12/backend/node_modules",
+        NODE_PATH: "/root/POOSD/POOSD-LargeProject_Team12/backend",
         NODE_ENV: "production",
       },
       instances: 1,
