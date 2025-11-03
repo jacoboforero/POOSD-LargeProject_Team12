@@ -69,9 +69,9 @@ jobs:
 
             echo "=== Restarting PM2 ==="
             # PM2 needs to run from the parent directory where dist/ is located
-            # and set cwd to backend/ where node_modules are
+            # Set NODE_PATH so Node can find modules in backend/node_modules
             cd /root/POOSD/POOSD-LargeProject_Team12
-            pm2 start dist/backend/src/index.js --name news-briefing-api --cwd /root/POOSD/POOSD-LargeProject_Team12/backend
+            NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend/node_modules pm2 start dist/backend/src/index.js --name news-briefing-api --cwd /root/POOSD/POOSD-LargeProject_Team12/backend
             pm2 save
 
             echo "=== Waiting for app to start ==="
