@@ -71,7 +71,15 @@ jobs:
             fi
 
             echo "=== Installing production dependencies ==="
+            echo "=== Checking package.json ==="
+            cat package.json | grep -A 20 '"dependencies"' | head -25
             npm ci --omit=dev
+            echo "=== Verifying npm install completed ==="
+            ls -la node_modules 2>&1 | head -5 || echo "node_modules directory not found!"
+            echo "=== Checking if packages are installed ==="
+            test -d node_modules/axios && echo "✅ axios found" || echo "❌ axios NOT found"
+            test -d node_modules/cheerio && echo "✅ cheerio found" || echo "❌ cheerio NOT found"
+            test -d node_modules/openai && echo "✅ openai found" || echo "❌ openai NOT found"
 
             echo "=== Stopping PM2 process ==="
             pm2 stop news-briefing-api || true
