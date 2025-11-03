@@ -86,6 +86,11 @@ jobs:
             echo "=== Verifying ecosystem.config.js contents ==="
             cat /root/POOSD/POOSD-LargeProject_Team12/backend/ecosystem.config.js | grep -A 2 "NODE_PATH" || echo "NODE_PATH not found in config"
             
+            echo "=== Verifying node_modules exists and has required packages ==="
+            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/node_modules/axios 2>&1 | head -3 || echo "axios not found in node_modules"
+            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/node_modules/cheerio 2>&1 | head -3 || echo "cheerio not found in node_modules"
+            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/node_modules/openai 2>&1 | head -3 || echo "openai not found in node_modules"
+            
             echo "=== Restarting PM2 with ecosystem config ==="
             pm2 start ecosystem.config.js
             pm2 save
