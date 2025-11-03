@@ -1,15 +1,14 @@
-name: Deploy to Server
+name: Deploy Backend to Server
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,35 +20,11 @@ jobs:
           cache: "npm"
           cache-dependency-path: "backend/package-lock.json"
 
-      - name: Install dependencies
+      - name: Verify build locally
         run: |
           cd backend
           npm ci
-
-      - name: Build application
-        run: |
-          cd backend
           npm run build
-
-      - name: Copy dist to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "backend/dist/"
-          target: "/root/POOSD/POOSD-LargeProject_Team12/"
-          strip_components: 0
-      
-      - name: Copy PM2 config and package files to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "backend/ecosystem.config.js,backend/package.json,backend/package-lock.json"
-          target: "/root/POOSD/POOSD-LargeProject_Team12/backend/"
-          strip_components: 1
 
       - name: Deploy to server
         uses: appleboy/ssh-action@v1.0.3
@@ -57,86 +32,29 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          script_stop: true
           script: |
             set -e
-            echo "=== Starting deployment ==="
+            echo "🚀 Starting deployment..."
+            
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
-
-            echo "=== Verify .env exists ==="
-            if [ ! -f .env ]; then
-              echo "❌ ERROR: No .env file! Deployment cannot continue."
-              echo "Please create backend/.env on the server with production values!"
-              exit 1
-            fi
-
-            echo "=== Installing production dependencies ==="
-            echo "=== Checking package.json ==="
-            cat package.json | grep -A 20 '"dependencies"' | head -25
+            
+            echo "📥 Pulling latest code..."
+            git pull origin main || true
+            
+            echo "📦 Installing dependencies..."
             npm ci --omit=dev
-            echo "=== Verifying npm install completed ==="
-            ls -la node_modules 2>&1 | head -5 || echo "node_modules directory not found!"
-            echo "=== Checking if packages are installed ==="
-            test -d node_modules/axios && echo "✅ axios found" || echo "❌ axios NOT found"
-            test -d node_modules/cheerio && echo "✅ cheerio found" || echo "❌ cheerio NOT found"
-            test -d node_modules/openai && echo "✅ openai found" || echo "❌ openai NOT found"
-            echo "=== If packages are missing, npm install failed or package.json is wrong ==="
-
-            echo "=== Stopping PM2 process ==="
-            pm2 stop news-briefing-api || true
-            pm2 delete news-briefing-api || true
-
-            echo "=== Verifying script file exists ==="
-            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js || echo "❌ Script file not found!"
-            echo "=== Testing script manually to see errors ==="
-            cd /root/POOSD/POOSD-LargeProject_Team12/backend
-            timeout 5 NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend node /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js 2>&1 | head -20 || echo "Script test completed (timeout or error)"
             
-            echo "=== Verifying ecosystem.config.js contents ==="
-            cat /root/POOSD/POOSD-LargeProject_Team12/backend/ecosystem.config.js | grep -A 2 "NODE_PATH" || echo "NODE_PATH not found in config"
+            echo "🔨 Building application..."
+            npm run build
             
-            echo "=== Verifying node_modules exists and has required packages ==="
-            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/node_modules/axios 2>&1 | head -3 || echo "axios not found in node_modules"
-            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/node_modules/cheerio 2>&1 | head -3 || echo "cheerio not found in node_modules"
-            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/node_modules/openai 2>&1 | head -3 || echo "openai not found in node_modules"
+            echo "🔄 Restarting PM2 process..."
+            pm2 restart news-briefing-api || pm2 start ecosystem.config.js
             
-            echo "=== Restarting PM2 with ecosystem config ==="
-            pm2 start ecosystem.config.js
+            echo "💾 Saving PM2 configuration..."
             pm2 save
-
-            echo "=== Waiting for app to start ==="
-            sleep 5
-
-            echo "=== Checking PM2 status ==="
-            pm2 list
-
-            echo "=== Checking PM2 logs for errors ==="
-            pm2 logs news-briefing-api --lines 50 --nostream || true
-            echo "=== Checking PM2 error logs specifically ==="
-            pm2 logs news-briefing-api --err --lines 100 --nostream || true
-            echo "=== PM2 describe to see full config ==="
-            pm2 describe news-briefing-api || true
-
-            echo "=== Checking PM2 environment variables ==="
-            pm2 env 0 | grep -E "NODE_PATH|NODE_ENV" || echo "Environment variables not found"
-
-            echo "=== Getting PORT from .env ==="
-            cd /root/POOSD/POOSD-LargeProject_Team12/backend
-            PORT=$(grep -E "^PORT=" .env | cut -d '=' -f2 || echo "4000")
-            echo "Port configured: ${PORT}"
-
-            echo "=== Verifying API responds ==="
-            if curl -f http://localhost:${PORT}/health > /dev/null 2>&1; then
-              echo "✅ API is responding on port ${PORT}!"
-              echo "=== Deployment successful ==="
-            else
-              echo "❌ API is not responding on port ${PORT}!"
-              echo "=== Full PM2 logs ==="
-              pm2 logs news-briefing-api --lines 50 --nostream
-              echo "=== PM2 error logs ==="
-              pm2 logs news-briefing-api --err --lines 50 --nostream || true
-              echo "=== Testing alternative ports ==="
-              curl -v http://localhost:3001/health || echo "Port 3001 failed"
-              curl -v http://localhost:4000/health || echo "Port 4000 failed"
-              exit 1
-            fi
+            
+            echo "⏳ Waiting for application to start..."
+            sleep 3
+            
+            echo "✅ Deployment complete!"
+            pm2 status

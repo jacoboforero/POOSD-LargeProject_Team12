@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "tsc",
-    "start": "node dist/backend/src/index.js",
+    "start": "node dist/index.js",
     "test:api": "node test-api.js",
     "test:api:local": "./scripts/test-local.sh",
     "test:api:prod": "./scripts/test-production.sh",
