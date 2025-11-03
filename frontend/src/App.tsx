@@ -7,7 +7,7 @@ import './App.css';
 function App() {
   const [currentPage, setCurrentPage] = useState<'login' | 'register' | 'landing'>('login');
   const [username, setUsername] = useState<string>('');
-  const [successMessage, setSuccessMessage] = useState<string>(''); // new state for messages
+  const [successMessage, setSuccessMessage] = useState<string>('');
 
   return (
     <div className="app-root">
@@ -29,7 +29,7 @@ function App() {
                 setUsername(name);
                 setCurrentPage('landing');
               }}
-              successMessage={successMessage} // pass message
+              successMessage={successMessage}
             />
           )}
 
@@ -37,9 +37,8 @@ function App() {
             <RegisterPage
               onNavigateToLogin={() => setCurrentPage('login')}
               onRegister={(name) => {
-                setUsername(name); // optional, could skip
                 setSuccessMessage('Registration successful! Please log in.');
-                setCurrentPage('login'); // go back to login
+                setCurrentPage('login');
               }}
             />
           )}

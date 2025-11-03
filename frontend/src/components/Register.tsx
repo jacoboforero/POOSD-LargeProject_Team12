@@ -63,7 +63,7 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
 
   return (
     <div className="auth-box">
-      <h2 className="auth-heading">Create Your IntelliBrief Account</h2>
+      <h2 className="auth-heading">Join IntelliBrief</h2>
 
       <form className="auth-form" onSubmit={handleSubmit}>
         <label className="question-label">First Name</label>
