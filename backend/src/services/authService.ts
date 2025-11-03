@@ -7,7 +7,15 @@ export class AuthService {
    * Register a new user account
    * Throws error if user already exists
    */
-  async register(email: string): Promise<void> {
+  async register(
+    email: string,
+    preferences?: {
+      topics?: string[];
+      interests?: string[];
+      jobIndustry?: string;
+      demographic?: string;
+    }
+  ): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
     // Check if user already exists
@@ -21,11 +29,16 @@ export class AuthService {
     const hashedCode = await bcrypt.hash(code, 10);
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    // Create new user
+    // Create new user with preferences
     const user = await UserModel.create({
       email: normalizedEmail,
       emailVerified: false,
-      preferences: { topics: [], interests: [] },
+      preferences: {
+        topics: preferences?.topics || [],
+        interests: preferences?.interests || [],
+        jobIndustry: preferences?.jobIndustry,
+        demographic: preferences?.demographic,
+      },
       limits: {
         dailyGenerateCap: 3,
         generatedCountToday: 0,
@@ -46,6 +59,15 @@ export class AuthService {
     console.log(`\n🆕 NEW USER REGISTRATION`);
     console.log(`📧 Email: ${normalizedEmail}`);
     console.log(`🔑 OTP Code: ${code}`);
+    console.log(`📋 Preferences:`);
+    console.log(`   Topics: ${user.preferences.topics.join(", ") || "None"}`);
+    console.log(`   Interests: ${user.preferences.interests.join(", ") || "None"}`);
+    if (user.preferences.jobIndustry) {
+      console.log(`   Job Industry: ${user.preferences.jobIndustry}`);
+    }
+    if (user.preferences.demographic) {
+      console.log(`   Demographic: ${user.preferences.demographic}`);
+    }
     console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
     console.log(`---\n`);
   }

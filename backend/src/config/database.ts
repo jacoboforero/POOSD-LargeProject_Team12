@@ -8,12 +8,17 @@ export async function connectDatabase(): Promise<void> {
       throw new Error('❌ MONGODB_URI is not defined in environment variables');
     }
 
-    await mongoose.connect(uri);
+    await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 10000, // 10 second timeout
+    });
     
     console.log('✅ MongoDB connected successfully');
   } catch (error) {
     console.error('❌ MongoDB connection failed:', error);
-    process.exit(1);
+    console.error('⚠️  Server will continue but database operations will fail');
+    console.error('💡 Make sure your IP is whitelisted in MongoDB Atlas');
+    // Don't exit - allow server to start for testing other endpoints
+    // process.exit(1);
   }
 }
 

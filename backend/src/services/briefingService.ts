@@ -1,12 +1,28 @@
 import { UserModel } from "../models/User.model";
 import { BriefingModel } from "../models/Briefing.model";
 import { NewsService } from "./newsService";
+import { ArticleScraper } from "./articleScraper";
+import OpenAI from "openai";
 
 export class BriefingService {
   private newsService: NewsService;
+  private articleScraper: ArticleScraper;
+  private openai: OpenAI | null = null;
 
   constructor() {
     this.newsService = new NewsService();
+    this.articleScraper = new ArticleScraper();
+  }
+
+  private getOpenAI(): OpenAI {
+    if (!this.openai) {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        throw new Error("OPENAI_API_KEY environment variable is required");
+      }
+      this.openai = new OpenAI({ apiKey });
+    }
+    return this.openai;
   }
 
   async generate(userId: string, request: any = {}) {
@@ -137,8 +153,12 @@ export class BriefingService {
           `🤖 Summarizing ${articles.length} articles for briefing ${briefingId}...`
         );
 
-        // Step 4: Generate AI summary (future implementation)
-        const summary = await this.generateSummary(articles, briefing.request);
+        // Step 4: Generate AI summary
+        const summary = await this.generateSummary(
+          articles,
+          briefing.request,
+          briefing.userId
+        );
 
         // Step 5: Complete briefing
         briefing.status = "done";
@@ -176,10 +196,11 @@ export class BriefingService {
   }
 
   /**
-   * Fetch news articles using NewsService
+   * Fetch news articles using NewsService and scrape full content
+   * Tries scraping articles one by one until we successfully scrape 3 articles
    *
    * @param briefing - The briefing document with request parameters
-   * @returns Promise<Article[]> - Array of fetched articles
+   * @returns Promise<Article[]> - Array of 3 articles with full scraped content
    */
   private async fetchNewsArticles(briefing: any): Promise<any[]> {
     try {
@@ -190,10 +211,82 @@ export class BriefingService {
       // Fetch articles from News API
       const articles = await this.newsService.fetchArticles(topics, interests);
 
-      // Basic validation and limit
-      return articles
-        .filter((article) => article.title && article.url)
-        .slice(0, 15); // Limit to 15 articles
+      // Basic validation
+      const validArticles = articles.filter(
+        (article) => article.title && article.url
+      );
+
+      console.log(
+        `📰 Fetched ${validArticles.length} articles, scraping until we get 3 with content...`
+      );
+
+      // Try scraping articles one by one until we get 3 successful scrapes
+      const articlesWithContent: any[] = [];
+      const MIN_CONTENT_LENGTH = 500; // Minimum characters to consider a successful scrape
+
+      for (const article of validArticles) {
+        if (articlesWithContent.length >= 3) {
+          break; // We have 3 successful scrapes, stop trying
+        }
+
+        console.log(
+          `🕷️  Attempting to scrape: ${article.title.substring(0, 50)}...`
+        );
+        const scrapedContent = await this.articleScraper.scrapeArticle(
+          article.url
+        );
+
+        // Only keep articles with substantial content
+        if (scrapedContent && scrapedContent.length >= MIN_CONTENT_LENGTH) {
+          articlesWithContent.push({
+            title: article.title,
+            url: article.url,
+            source:
+              typeof article.source === "string"
+                ? article.source
+                : article.source?.name || "Unknown",
+            publishedAt: article.publishedAt,
+            content: scrapedContent,
+          });
+          console.log(
+            `✅ Successfully scraped ${scrapedContent.length} characters (${articlesWithContent.length}/3)`
+          );
+        } else {
+          console.log(
+            `⚠️  Scraped content too short or failed (${
+              scrapedContent?.length || 0
+            } chars), trying next article...`
+          );
+        }
+
+        // Small delay between scrapes to be respectful
+        if (articlesWithContent.length < 3) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
+
+      if (articlesWithContent.length === 0) {
+        console.log(
+          `⚠️  Could not scrape any articles with sufficient content, using fallback`
+        );
+        return [
+          {
+            title: "Unable to scrape article content",
+            description:
+              "We found articles but couldn't extract full content. Please try again later.",
+            url: "#",
+            source: { name: "System" },
+            publishedAt: new Date(),
+            content: "",
+          },
+        ];
+      }
+
+      console.log(
+        `✅ Final: ${articlesWithContent.length} articles with full content ready for summarization`
+      );
+
+      return articlesWithContent;
     } catch (error) {
       console.error("❌ Error fetching news articles:", error);
 
@@ -206,44 +299,216 @@ export class BriefingService {
           url: "#",
           source: { name: "System" },
           publishedAt: new Date(),
+          content: "",
         },
       ];
     }
   }
 
   /**
-   * Generate AI summary of articles (future implementation)
+   * Generate AI summary of articles using OpenAI GPT-4o
    *
-   * @param articles - Array of articles to summarize
+   * @param articles - Array of articles to summarize (with full content)
    * @param request - Original briefing request parameters
+   * @param userId - User ID to fetch user profile
    * @returns Promise<Summary> - Generated summary
    */
-  private async generateSummary(articles: any[], request: any): Promise<any> {
-    // TODO: Implement AI summarization
-    // - Use OpenAI API or similar service
-    // - Build prompt based on articles and user preferences
-    // - Handle different article categories
-    // - Generate structured summary with sections
-    // - Track token usage for billing
+  private async generateSummary(
+    articles: any[],
+    request: any,
+    userId: string
+  ): Promise<any> {
+    try {
+      // Fetch user to get full profile
+      const user = await UserModel.findById(userId);
+      if (!user) {
+        throw new Error("User not found for summarization");
+      }
 
-    // For now, return stub summary
-    return {
-      sections: [
-        {
-          category: "technology",
-          text: `Found ${articles.length} articles about ${
-            request.topics?.join(", ") || "your interests"
-          }. Real AI summarization coming soon!`,
+      // Build comprehensive prompt
+      const prompt = this.buildSummaryPrompt(articles, request, user);
+
+      console.log(`🤖 Calling OpenAI API with ${articles.length} articles...`);
+
+      // Call OpenAI API
+      const completion = await this.getOpenAI().chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an expert news analyst that creates personalized briefings. Your summaries should be clear, concise, and highlight how each article relates to the user's specific interests and context.",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 2000,
+      });
+
+      const summaryText = completion.choices[0]?.message?.content || "";
+      const inputTokens = completion.usage?.prompt_tokens || 0;
+      const outputTokens = completion.usage?.completion_tokens || 0;
+
+      console.log(`✅ OpenAI response: ${outputTokens} tokens generated`);
+
+      // Parse and structure the response
+      const sections = this.parseSummaryResponse(summaryText, articles);
+
+      return {
+        sections,
+        generatedAt: new Date(),
+        llm: {
+          provider: "openai",
+          model: "gpt-4o",
+          inputTokens,
+          outputTokens,
         },
-      ],
-      generatedAt: new Date(),
-      llm: {
-        provider: "openai", // TODO: Make configurable
-        model: "gpt-4o-mini", // TODO: Make configurable
-        inputTokens: 0, // TODO: Track actual usage
-        outputTokens: 0, // TODO: Track actual usage
+        citations: articles.map((article) => ({
+          title: article.title,
+          url: article.url,
+          source: article.source?.name,
+          publishedAt: article.publishedAt,
+        })),
+      };
+    } catch (error) {
+      console.error("❌ Error generating AI summary:", error);
+
+      // Return fallback summary on error
+      return {
+        sections: [
+          {
+            category: "error",
+            text: `Unable to generate AI summary at this time. Found ${
+              articles.length
+            } articles about ${
+              request.topics?.join(", ") || "your interests"
+            }.`,
+          },
+        ],
+        generatedAt: new Date(),
+        llm: {
+          provider: "openai",
+          model: "gpt-4o",
+          inputTokens: 0,
+          outputTokens: 0,
+        },
+      };
+    }
+  }
+
+  /**
+   * Build comprehensive prompt for OpenAI
+   */
+  private buildSummaryPrompt(articles: any[], request: any, user: any): string {
+    const topics = request.topics || user.preferences.topics || [];
+    const interests = request.interests || user.preferences.interests || [];
+    const jobIndustry = request.jobIndustry || user.preferences.jobIndustry;
+    const demographic = request.demographic || user.preferences.demographic;
+
+    let prompt = `Create a personalized news briefing based on the following information:
+
+## User Context:
+- Topics of Interest: ${topics.join(", ") || "Not specified"}
+- Specific Interests: ${interests.join(", ") || "Not specified"}
+${jobIndustry ? `- Job Industry: ${jobIndustry}` : ""}
+${demographic ? `- Demographic: ${demographic}` : ""}
+
+## Purpose:
+You are creating a personalized news briefing that summarizes ${
+      articles.length
+    } articles. Your summary should:
+1. Highlight the key points from each article
+2. Explain how each article relates to the user's areas of interest
+3. Provide context about why these articles matter to someone with these interests
+4. Create a cohesive narrative that ties the articles together
+
+## Articles to Summarize:
+
+`;
+
+    articles.forEach((article, index) => {
+      prompt += `### Article ${index + 1}: ${article.title}
+- Source: ${article.source?.name || "Unknown"}
+- Published: ${
+        article.publishedAt
+          ? new Date(article.publishedAt).toLocaleDateString()
+          : "Unknown"
+      }
+- URL: ${article.url}
+
+**Full Content:**
+${article.content || article.description || "No content available"}
+
+---
+
+`;
+    });
+
+    prompt += `## Instructions:
+Generate a well-structured briefing that:
+1. Starts with a brief overview connecting all articles to the user's interests
+2. Summarizes each article's key points
+3. Explains the relevance and implications for the user based on their interests (${topics.join(
+      ", "
+    )}${interests.length > 0 ? `, ${interests.join(", ")}` : ""})
+4. Maintains a professional but engaging tone
+
+Format your response as a single cohesive briefing text that flows naturally.`;
+
+    return prompt;
+  }
+
+  /**
+   * Parse OpenAI response into structured sections
+   */
+  private parseSummaryResponse(
+    summaryText: string,
+    articles: any[]
+  ): Array<{ category: string; text: string }> {
+    // Try to detect natural sections/categories in the response
+    // For now, create a single comprehensive section
+    // In the future, we could use structured outputs or parse multiple sections
+
+    // If the response seems to have natural breaks (double newlines), try to split into sections
+    const paragraphs = summaryText
+      .split("\n\n")
+      .filter((p) => p.trim().length > 0);
+
+    if (paragraphs.length > 1) {
+      // Multiple paragraphs - treat as sections based on content
+      const sections: Array<{ category: string; text: string }> = [];
+
+      // First paragraph is usually overview
+      if (paragraphs[0]) {
+        sections.push({
+          category: "overview",
+          text: paragraphs[0].trim(),
+        });
+      }
+
+      // Remaining paragraphs as main content
+      if (paragraphs.length > 1) {
+        sections.push({
+          category: "summary",
+          text: paragraphs.slice(1).join("\n\n").trim(),
+        });
+      }
+
+      return sections.length > 0
+        ? sections
+        : [{ category: "summary", text: summaryText.trim() }];
+    }
+
+    // Single cohesive summary
+    return [
+      {
+        category: "briefing",
+        text: summaryText.trim(),
       },
-    };
+    ];
   }
 
   private getNextResetTime(): Date {

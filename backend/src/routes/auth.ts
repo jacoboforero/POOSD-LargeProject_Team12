@@ -15,8 +15,21 @@ const authService = new AuthService();
 // POST /api/auth/register
 router.post("/register", ipRateLimit, async (req, res, next) => {
   try {
-    const { email } = req.body;
-    await authService.register(email);
+    const { 
+      email, 
+      topics = [], 
+      interests = [], 
+      jobIndustry, 
+      demographic 
+    } = req.body;
+    
+    await authService.register(email, {
+      topics: Array.isArray(topics) ? topics : [],
+      interests: Array.isArray(interests) ? interests : [],
+      jobIndustry,
+      demographic,
+    });
+    
     res.status(201).json({
       success: true,
       message:
