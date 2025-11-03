@@ -77,8 +77,13 @@ jobs:
             pm2 stop news-briefing-api || true
             pm2 delete news-briefing-api || true
 
-            echo "=== Restarting PM2 with ecosystem config ==="
+            echo "=== Verifying script file exists ==="
+            ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js || echo "❌ Script file not found!"
+            echo "=== Testing script manually to see errors ==="
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
+            NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend/node_modules node /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js 2>&1 | head -20 || echo "Script failed with above errors"
+            
+            echo "=== Restarting PM2 with ecosystem config ==="
             pm2 start ecosystem.config.js
             pm2 save
 
