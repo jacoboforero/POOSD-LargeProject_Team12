@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # Simple deployment script - run this on the server after pushing changes
+# Deployment tested and working - 2024
 
 set -e
 
