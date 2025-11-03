@@ -41,8 +41,8 @@ jobs:
             echo "📥 Pulling latest code..."
             git pull origin main || true
             
-            echo "📦 Installing dependencies..."
-            npm ci --omit=dev
+            echo "📦 Installing dependencies (including dev for build)..."
+            npm ci
             
             echo "🔨 Building application..."
             npm run build
