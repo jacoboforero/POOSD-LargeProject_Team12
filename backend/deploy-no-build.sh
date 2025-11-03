@@ -2,6 +2,7 @@
 
 # Deployment script for automated deployment (build is done in GitHub Actions)
 # This script skips building and just installs dependencies and restarts
+# Updated to avoid OOM issues on low-memory servers
 
 set -e
 
