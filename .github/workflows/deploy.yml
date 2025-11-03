@@ -63,8 +63,15 @@ jobs:
             echo "=== Installing production dependencies ==="
             npm ci --omit=dev
 
+            echo "=== Stopping PM2 process ==="
+            pm2 stop news-briefing-api || true
+            pm2 delete news-briefing-api || true
+
             echo "=== Restarting PM2 ==="
-            pm2 restart news-briefing-api || pm2 start dist/backend/src/index.js --name news-briefing-api
+            # PM2 needs to run from the parent directory where dist/ is located
+            # and set cwd to backend/ where node_modules are
+            cd /root/POOSD/POOSD-LargeProject_Team12
+            pm2 start dist/backend/src/index.js --name news-briefing-api --cwd /root/POOSD/POOSD-LargeProject_Team12/backend
             pm2 save
 
             echo "=== Waiting for app to start ==="
@@ -77,6 +84,7 @@ jobs:
             pm2 logs news-briefing-api --lines 20 --nostream || true
 
             echo "=== Getting PORT from .env ==="
+            cd /root/POOSD/POOSD-LargeProject_Team12/backend
             PORT=$(grep -E "^PORT=" .env | cut -d '=' -f2 || echo "4000")
             echo "Port configured: ${PORT}"
 
