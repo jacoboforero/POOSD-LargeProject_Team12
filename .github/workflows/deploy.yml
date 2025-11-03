@@ -81,7 +81,10 @@ jobs:
             ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js || echo "❌ Script file not found!"
             echo "=== Testing script manually to see errors ==="
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
-            NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend/node_modules node /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js 2>&1 | head -20 || echo "Script failed with above errors"
+            NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend node /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js 2>&1 | head -20 || echo "Script failed with above errors"
+            
+            echo "=== Verifying ecosystem.config.js contents ==="
+            cat /root/POOSD/POOSD-LargeProject_Team12/backend/ecosystem.config.js | grep -A 2 "NODE_PATH" || echo "NODE_PATH not found in config"
             
             echo "=== Restarting PM2 with ecosystem config ==="
             pm2 start ecosystem.config.js
