@@ -65,4 +65,16 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+
+  html, body, #root {
+  height: 100%;
+  margin: 0;
+  background-image: url('/background.jpeg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
 }
