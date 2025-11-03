@@ -73,13 +73,25 @@ jobs:
             echo "=== Checking PM2 status ==="
             pm2 list
 
+            echo "=== Checking PM2 logs for errors ==="
+            pm2 logs news-briefing-api --lines 20 --nostream || true
+
+            echo "=== Getting PORT from .env ==="
+            PORT=$(grep -E "^PORT=" .env | cut -d '=' -f2 || echo "4000")
+            echo "Port configured: ${PORT}"
+
             echo "=== Verifying API responds ==="
-            if curl -f http://localhost:3001/health > /dev/null 2>&1; then
-              echo "✅ API is responding!"
+            if curl -f http://localhost:${PORT}/health > /dev/null 2>&1; then
+              echo "✅ API is responding on port ${PORT}!"
               echo "=== Deployment successful ==="
             else
-              echo "❌ API is not responding!"
-              echo "=== Checking logs ==="
-              pm2 logs news-briefing-api --lines 30 --nostream
+              echo "❌ API is not responding on port ${PORT}!"
+              echo "=== Full PM2 logs ==="
+              pm2 logs news-briefing-api --lines 50 --nostream
+              echo "=== PM2 error logs ==="
+              pm2 logs news-briefing-api --err --lines 50 --nostream || true
+              echo "=== Testing alternative ports ==="
+              curl -v http://localhost:3001/health || echo "Port 3001 failed"
+              curl -v http://localhost:4000/health || echo "Port 4000 failed"
               exit 1
             fi
