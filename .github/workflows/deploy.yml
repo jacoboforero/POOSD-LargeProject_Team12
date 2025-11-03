@@ -89,7 +89,11 @@ jobs:
             pm2 list
 
             echo "=== Checking PM2 logs for errors ==="
-            pm2 logs news-briefing-api --lines 20 --nostream || true
+            pm2 logs news-briefing-api --lines 50 --nostream || true
+            echo "=== Checking PM2 error logs specifically ==="
+            pm2 logs news-briefing-api --err --lines 100 --nostream || true
+            echo "=== PM2 describe to see full config ==="
+            pm2 describe news-briefing-api || true
 
             echo "=== Getting PORT from .env ==="
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
