@@ -80,6 +80,7 @@ jobs:
             test -d node_modules/axios && echo "✅ axios found" || echo "❌ axios NOT found"
             test -d node_modules/cheerio && echo "✅ cheerio found" || echo "❌ cheerio NOT found"
             test -d node_modules/openai && echo "✅ openai found" || echo "❌ openai NOT found"
+            echo "=== If packages are missing, npm install failed or package.json is wrong ==="
 
             echo "=== Stopping PM2 process ==="
             pm2 stop news-briefing-api || true
@@ -89,7 +90,7 @@ jobs:
             ls -la /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js || echo "❌ Script file not found!"
             echo "=== Testing script manually to see errors ==="
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
-            NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend node /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js 2>&1 | head -20 || echo "Script failed with above errors"
+            timeout 5 NODE_PATH=/root/POOSD/POOSD-LargeProject_Team12/backend node /root/POOSD/POOSD-LargeProject_Team12/backend/dist/backend/src/index.js 2>&1 | head -20 || echo "Script test completed (timeout or error)"
             
             echo "=== Verifying ecosystem.config.js contents ==="
             cat /root/POOSD/POOSD-LargeProject_Team12/backend/ecosystem.config.js | grep -A 2 "NODE_PATH" || echo "NODE_PATH not found in config"
