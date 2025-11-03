@@ -97,8 +97,11 @@ jobs:
             pm2 logs news-briefing-api --lines 50 --nostream || true
             echo "=== Checking PM2 error logs specifically ==="
             pm2 logs news-briefing-api --err --lines 100 --nostream || true
-            echo "=== PM2 describe to see full config ==="
-            pm2 describe news-briefing-api || true
+echo "=== PM2 describe to see full config ==="
+pm2 describe news-briefing-api || true
+
+echo "=== Checking PM2 environment variables ==="
+pm2 env 0 | grep -E "NODE_PATH|NODE_ENV" || echo "Environment variables not found"
 
             echo "=== Getting PORT from .env ==="
             cd /root/POOSD/POOSD-LargeProject_Team12/backend
