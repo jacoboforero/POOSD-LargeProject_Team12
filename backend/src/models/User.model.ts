@@ -15,6 +15,12 @@ export interface IUser extends Document {
     demographic?: string;
     jobIndustry?: string;
     interests: string[];
+    location?: string; // City, state, or country
+    lifeStage?: string; // e.g., student, young professional, parent, retiree
+    newsStyle?: string; // Quick summaries / Thoughtful analysis / Opinion pieces
+    newsScope?: string; // global / local / both
+    preferredHeadlines?: string[]; // Types of headlines that make you stop
+    scrollPastTopics?: string[]; // Types of headlines you scroll past
   };
   limits: {
     dailyGenerateCap: number;
@@ -56,6 +62,12 @@ const UserSchema = new Schema<IUser>({
     demographic: String,
     jobIndustry: String,
     interests: { type: [String], default: [] },
+    location: String,
+    lifeStage: String,
+    newsStyle: String,
+    newsScope: String,
+    preferredHeadlines: { type: [String], default: [] },
+    scrollPastTopics: { type: [String], default: [] },
   },
 
   limits: {

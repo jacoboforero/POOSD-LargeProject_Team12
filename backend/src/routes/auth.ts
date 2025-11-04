@@ -20,7 +20,13 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       topics = [], 
       interests = [], 
       jobIndustry, 
-      demographic 
+      demographic,
+      location,
+      lifeStage,
+      newsStyle,
+      newsScope,
+      preferredHeadlines = [],
+      scrollPastTopics = []
     } = req.body;
     
     await authService.register(email, {
@@ -28,6 +34,12 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       interests: Array.isArray(interests) ? interests : [],
       jobIndustry,
       demographic,
+      location,
+      lifeStage,
+      newsStyle,
+      newsScope,
+      preferredHeadlines: Array.isArray(preferredHeadlines) ? preferredHeadlines : [],
+      scrollPastTopics: Array.isArray(scrollPastTopics) ? scrollPastTopics : [],
     });
     
     res.status(201).json({
@@ -47,7 +59,7 @@ router.post("/login", ipRateLimit, async (req, res, next) => {
     await authService.login(email);
     res.json({
       success: true,
-      message: "OTP sent. Please check your console for the code.",
+      message: "Login link sent! Please check your email for verification.",
     });
   } catch (error) {
     next(error);

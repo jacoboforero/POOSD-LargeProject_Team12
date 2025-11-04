@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
@@ -25,9 +25,12 @@ function App() {
                 setSuccessMessage('');
                 setCurrentPage('register');
               }}
-              onLogin={(name) => {
-                setUsername(name);
-                setCurrentPage('landing');
+              onLogin={(email) => {
+                // Email verification link sent - user will verify via email
+                // After verification, they'll be logged in
+                setUsername(email);
+                // Note: In a real app, you'd wait for email verification before redirecting
+                // For now, we'll show a success message
               }}
               successMessage={successMessage}
             />
@@ -36,7 +39,7 @@ function App() {
           {currentPage === 'register' && (
             <RegisterPage
               onNavigateToLogin={() => setCurrentPage('login')}
-              onRegister={(name) => {
+              onRegister={() => {
                 setSuccessMessage('Registration successful! Please log in.');
                 setCurrentPage('login');
               }}
