@@ -1,61 +1,65 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { registerUser } from "../services/authApi";
 
 interface RegisterProps {
   onNavigateToLogin?: () => void;
-  onRegister?: (username: string) => void;
+  onRegister?: (email: string) => void;
 }
 
 const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [topics, setTopics] = useState("");
-  const [interests, setInterests] = useState("");
+  const [location, setLocation] = useState("");
+  const [lifeStage, setLifeStage] = useState("");
   const [jobIndustry, setJobIndustry] = useState("");
-  const [demographic, setDemographic] = useState("");
+  const [attentionGrabbers, setAttentionGrabbers] = useState("");
+  const [generalInterests, setGeneralInterests] = useState("");
+  const [newsStyle, setNewsStyle] = useState("");
+  const [newsScope, setNewsScope] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>("");
+
+  const parseArrayField = (value: string): string[] => {
+    if (!value.trim()) return [];
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
 
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !username ||
-      !password ||
-      !topics ||
-      !interests ||
-      !jobIndustry ||
-      !demographic
-    ) {
-      alert("Please fill in all fields.");
+    if (!email) {
+      setError("Email is required.");
       return;
     }
 
     try {
       setLoading(true);
-      await axios.post("/api/auth/register", {
-        firstName,
-        lastName,
+      
+      const topicsArray = parseArrayField(attentionGrabbers);
+      const interestsArray = parseArrayField(generalInterests);
+
+      const response = await registerUser({
         email,
-        username,
-        password,
-        topics,
-        interests,
-        jobIndustry,
-        demographic,
+        topics: topicsArray,
+        interests: interestsArray,
+        jobIndustry: jobIndustry.trim() || undefined,
+        location: location.trim() || undefined,
+        lifeStage: lifeStage.trim() || undefined,
+        newsStyle: newsStyle || undefined,
+        newsScope: newsScope || undefined,
       });
 
-      alert("Registration successful! You can now log in.");
-      if (onRegister) onRegister(username);
+      alert(response.message || "Registration successful! Please check your console for OTP code.");
+      if (onRegister) onRegister(email);
       if (onNavigateToLogin) onNavigateToLogin();
     } catch (error: any) {
       console.error("Registration failed:", error.response?.data || error.message);
-      alert("Registration failed. Please try again.");
+      const errorMessage = error.response?.data?.message || error.message || "Registration failed. Please try again.";
+      setError(errorMessage);
+      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -66,83 +70,110 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
       <h2 className="auth-heading">Join IntelliBrief</h2>
 
       <form className="auth-form" onSubmit={handleSubmit}>
-        <label className="question-label">First Name</label>
-        <input
-          className="auth-input"
-          value={firstName}
-          onChange={(e) => setFirstName(e.target.value)}
-        />
-
-        <label className="question-label">Last Name</label>
-        <input
-          className="auth-input"
-          value={lastName}
-          onChange={(e) => setLastName(e.target.value)}
-        />
-
         <label className="question-label">Email</label>
         <input
           className="auth-input"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-        />
-
-        <label className="question-label">Username</label>
-        <input
-          className="auth-input"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-
-        <label className="question-label">Password</label>
-        <input
-          className="auth-input"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="your.email@example.com"
         />
 
         <div className="personalization-section">
-          <h3 className="section-title">🗞️ Personalize Your Daily Briefing</h3>
-          <p className="section-subtitle">Let’s learn a bit about your news style</p>
-
+          <h3 className="section-title">About You</h3>
+          
           <label className="question-label">
-            📰 What topics make headlines in your world?
+            Where are you tuning in from? (City, state, or country)
           </label>
           <input
             className="auth-input"
-            value={topics}
-            onChange={(e) => setTopics(e.target.value)}
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g., New York, NY or United States"
           />
 
           <label className="question-label">
-            💡 What subjects always catch your curiosity?
+            What best describes your current stage in life?
           </label>
           <input
             className="auth-input"
-            value={interests}
-            onChange={(e) => setInterests(e.target.value)}
+            value={lifeStage}
+            onChange={(e) => setLifeStage(e.target.value)}
+            placeholder="e.g., student, young professional, parent, retiree"
           />
 
           <label className="question-label">
-            💼 What industry are you part of (or dreaming of joining)?
+            What field or industry are you part of?
           </label>
           <input
             className="auth-input"
             value={jobIndustry}
             onChange={(e) => setJobIndustry(e.target.value)}
+            placeholder="e.g., healthcare, tech, education"
           />
+        </div>
+
+        <div className="personalization-section">
+          <h3 className="section-title">News Preferences</h3>
+          <p className="section-subtitle">
+            (Helps the briefing decide which topics and styles to prioritize.)
+          </p>
 
           <label className="question-label">
-            👤 How would you describe yourself as a reader?
+            What kinds of stories always grab your attention?
           </label>
           <input
             className="auth-input"
-            value={demographic}
-            onChange={(e) => setDemographic(e.target.value)}
+            value={attentionGrabbers}
+            onChange={(e) => setAttentionGrabbers(e.target.value)}
+            placeholder="e.g., world news, tech, culture, politics, science (comma-separated)"
           />
+
+          <label className="question-label">
+            What are your general interests or passions?
+          </label>
+          <input
+            className="auth-input"
+            value={generalInterests}
+            onChange={(e) => setGeneralInterests(e.target.value)}
+            placeholder="e.g., technology, art, science, sports, travel, cooking (comma-separated)"
+          />
+
+          <label className="question-label">
+            How do you like your news served?
+          </label>
+          <select
+            className="auth-input"
+            value={newsStyle}
+            onChange={(e) => setNewsStyle(e.target.value)}
+          >
+            <option value="">Select an option</option>
+            <option value="Quick summaries">Quick summaries</option>
+            <option value="Thoughtful analysis">Thoughtful analysis</option>
+            <option value="Opinion pieces">Opinion pieces</option>
+          </select>
+
+          <label className="question-label">
+            Do you prefer global perspectives, local updates, or both?
+          </label>
+          <select
+            className="auth-input"
+            value={newsScope}
+            onChange={(e) => setNewsScope(e.target.value)}
+          >
+            <option value="">Select an option</option>
+            <option value="global">Global perspectives</option>
+            <option value="local">Local updates</option>
+            <option value="both">Both</option>
+          </select>
         </div>
+
+        {error && (
+          <div className="error-message" style={{ color: "red", marginBottom: "10px" }}>
+            {error}
+          </div>
+        )}
 
         <button className="auth-button" type="submit" disabled={loading}>
           {loading ? "Creating account..." : "Sign Up"}

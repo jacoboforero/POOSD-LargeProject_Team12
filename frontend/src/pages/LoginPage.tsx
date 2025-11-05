@@ -1,9 +1,8 @@
-import React from 'react';
 import Login from '../components/Login';
 
 interface Props {
   onNavigateToRegister?: () => void;
-  onLogin?: (username: string) => void;
+  onLogin?: (email: string) => void;
   successMessage?: string;
 }
 

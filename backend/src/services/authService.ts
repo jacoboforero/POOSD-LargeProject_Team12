@@ -14,6 +14,12 @@ export class AuthService {
       interests?: string[];
       jobIndustry?: string;
       demographic?: string;
+      location?: string;
+      lifeStage?: string;
+      newsStyle?: string;
+      newsScope?: string;
+      preferredHeadlines?: string[];
+      scrollPastTopics?: string[];
     }
   ): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
@@ -38,6 +44,12 @@ export class AuthService {
         interests: preferences?.interests || [],
         jobIndustry: preferences?.jobIndustry,
         demographic: preferences?.demographic,
+        location: preferences?.location,
+        lifeStage: preferences?.lifeStage,
+        newsStyle: preferences?.newsStyle,
+        newsScope: preferences?.newsScope,
+        preferredHeadlines: preferences?.preferredHeadlines || [],
+        scrollPastTopics: preferences?.scrollPastTopics || [],
       },
       limits: {
         dailyGenerateCap: 3,
@@ -67,6 +79,24 @@ export class AuthService {
     }
     if (user.preferences.demographic) {
       console.log(`   Demographic: ${user.preferences.demographic}`);
+    }
+    if (user.preferences.location) {
+      console.log(`   Location: ${user.preferences.location}`);
+    }
+    if (user.preferences.lifeStage) {
+      console.log(`   Life Stage: ${user.preferences.lifeStage}`);
+    }
+    if (user.preferences.newsStyle) {
+      console.log(`   News Style: ${user.preferences.newsStyle}`);
+    }
+    if (user.preferences.newsScope) {
+      console.log(`   News Scope: ${user.preferences.newsScope}`);
+    }
+    if (user.preferences.preferredHeadlines?.length) {
+      console.log(`   Preferred Headlines: ${user.preferences.preferredHeadlines.join(", ")}`);
+    }
+    if (user.preferences.scrollPastTopics?.length) {
+      console.log(`   Scroll Past Topics: ${user.preferences.scrollPastTopics.join(", ")}`);
     }
     console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
     console.log(`---\n`);

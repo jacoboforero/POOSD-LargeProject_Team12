@@ -9,6 +9,12 @@ export interface IBriefing extends Document {
     interests?: string[];
     jobIndustry?: string;
     demographic?: string;
+    location?: string;
+    lifeStage?: string;
+    newsStyle?: string;
+    newsScope?: string;
+    preferredHeadlines?: string[];
+    scrollPastTopics?: string[];
     source: string;
   };
   articles: Array<{
@@ -83,6 +89,12 @@ const BriefingSchema = new Schema<IBriefing>({
     interests: [String],
     jobIndustry: String,
     demographic: String,
+    location: String,
+    lifeStage: String,
+    newsStyle: String,
+    newsScope: String,
+    preferredHeadlines: [String],
+    scrollPastTopics: [String],
     source: { type: String, default: 'news_api' },
   },
 
