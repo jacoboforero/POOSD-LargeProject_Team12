@@ -2,7 +2,7 @@ import Login from '../components/Login';
 
 interface Props {
   onNavigateToRegister?: () => void;
-  onLogin?: (email: string) => void;
+  onLogin?: (email: string, token: string) => void;
   successMessage?: string;
 }
 

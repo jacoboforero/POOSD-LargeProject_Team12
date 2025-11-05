@@ -7,6 +7,7 @@ import './App.css';
 function App() {
   const [currentPage, setCurrentPage] = useState<'login' | 'register' | 'landing'>('login');
   const [username, setUsername] = useState<string>('');
+  const [token, setToken] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
 
   return (
@@ -25,12 +26,10 @@ function App() {
                 setSuccessMessage('');
                 setCurrentPage('register');
               }}
-              onLogin={(email) => {
-                // Email verification link sent - user will verify via email
-                // After verification, they'll be logged in
+              onLogin={(email, authToken) => {
                 setUsername(email);
-                // Note: In a real app, you'd wait for email verification before redirecting
-                // For now, we'll show a success message
+                setToken(authToken);
+                setCurrentPage('landing');
               }}
               successMessage={successMessage}
             />
@@ -39,14 +38,15 @@ function App() {
           {currentPage === 'register' && (
             <RegisterPage
               onNavigateToLogin={() => setCurrentPage('login')}
-              onRegister={() => {
-                setSuccessMessage('Registration successful! Please log in.');
-                setCurrentPage('login');
+              onRegister={(email, authToken) => {
+                setUsername(email);
+                setToken(authToken);
+                setCurrentPage('landing');
               }}
             />
           )}
 
-          {currentPage === 'landing' && <LandingPage username={username} />}
+          {currentPage === 'landing' && <LandingPage username={username} token={token} />}
         </main>
       </div>
     </div>

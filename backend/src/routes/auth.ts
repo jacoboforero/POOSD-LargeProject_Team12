@@ -15,11 +15,12 @@ const authService = new AuthService();
 // POST /api/auth/register
 router.post("/register", ipRateLimit, async (req, res, next) => {
   try {
-    const { 
-      email, 
-      topics = [], 
-      interests = [], 
-      jobIndustry, 
+    const {
+      email,
+      name,
+      topics = [],
+      interests = [],
+      jobIndustry,
       demographic,
       location,
       lifeStage,
@@ -28,8 +29,8 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       preferredHeadlines = [],
       scrollPastTopics = []
     } = req.body;
-    
-    await authService.register(email, {
+
+    await authService.register(email, name, {
       topics: Array.isArray(topics) ? topics : [],
       interests: Array.isArray(interests) ? interests : [],
       jobIndustry,

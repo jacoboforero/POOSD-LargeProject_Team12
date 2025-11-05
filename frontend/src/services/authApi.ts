@@ -2,6 +2,7 @@ import axios from 'axios';
 
 export interface RegisterRequest {
   email: string;
+  name?: string;
   topics?: string[];
   interests?: string[];
   jobIndustry?: string;
@@ -29,6 +30,7 @@ export interface Session {
   user: {
     _id: string;
     email: string;
+    name?: string;
     emailVerified: boolean;
     preferences: {
       topics: string[];
@@ -46,6 +48,7 @@ export interface Session {
 export const registerUser = async (data: RegisterRequest): Promise<RegisterResponse> => {
   const response = await axios.post<RegisterResponse>('/api/auth/register', {
     email: data.email.toLowerCase().trim(),
+    name: data.name,
     topics: Array.isArray(data.topics) ? data.topics : (data.topics ? [data.topics] : []),
     interests: Array.isArray(data.interests) ? data.interests : (data.interests ? [data.interests] : []),
     jobIndustry: data.jobIndustry,
@@ -77,6 +80,52 @@ export const verifyOtp = async (data: VerifyRequest): Promise<Session> => {
 export const loginUser = async (email: string): Promise<RegisterResponse> => {
   const response = await axios.post<RegisterResponse>('/api/auth/login', {
     email: email.toLowerCase().trim(),
+  });
+  return response.data;
+};
+
+/**
+ * Generate a new briefing
+ */
+export const generateBriefing = async (token: string): Promise<{ briefingId: string }> => {
+  const response = await axios.post<{ briefingId: string }>(
+    '/api/briefings/generate',
+    {},
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return response.data;
+};
+
+/**
+ * Get briefing status
+ */
+export const getBriefingStatus = async (
+  briefingId: string,
+  token: string
+): Promise<{ status: string; progress?: number; statusReason?: string }> => {
+  const response = await axios.get(`/api/briefings/${briefingId}/status`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.data;
+};
+
+/**
+ * Get complete briefing
+ */
+export const getBriefing = async (
+  briefingId: string,
+  token: string
+): Promise<{ summary: { sections: Array<{ category?: string; text?: string }> } }> => {
+  const response = await axios.get(`/api/briefings/${briefingId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
   return response.data;
 };

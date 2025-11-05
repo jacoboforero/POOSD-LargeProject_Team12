@@ -205,6 +205,89 @@ body::after {
   font-weight: 700;
 }
 
+.personal-briefing h1 {
+  font-size: 1.5rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.personal-briefing h3 {
+  font-size: 1.1rem;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.personal-briefing p {
+  margin-bottom: 1rem;
+  line-height: 1.7;
+}
+
+.personal-briefing a {
+  color: #111;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.personal-briefing a:hover {
+  color: #000;
+  text-decoration: none;
+}
+
+.personal-briefing ul,
+.personal-briefing ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.personal-briefing li {
+  margin-bottom: 0.5rem;
+  line-height: 1.6;
+}
+
+.personal-briefing strong {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.personal-briefing em {
+  font-style: italic;
+}
+
+.personal-briefing blockquote {
+  border-left: 3px solid #d8d2c4;
+  padding-left: 1rem;
+  margin-left: 0;
+  margin-right: 0;
+  margin-bottom: 1rem;
+  color: #4b4b4b;
+  font-style: italic;
+}
+
+.personal-briefing code {
+  background-color: #f5f2f0;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-family: "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+.personal-briefing pre {
+  background-color: #f5f2f0;
+  padding: 1rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.personal-briefing pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
 .featured-article {
   flex: 2;
   display: flex;

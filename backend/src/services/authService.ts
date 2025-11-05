@@ -9,6 +9,7 @@ export class AuthService {
    */
   async register(
     email: string,
+    name?: string,
     preferences?: {
       topics?: string[];
       interests?: string[];
@@ -38,6 +39,7 @@ export class AuthService {
     // Create new user with preferences
     const user = await UserModel.create({
       email: normalizedEmail,
+      name: name,
       emailVerified: false,
       preferences: {
         topics: preferences?.topics || [],
@@ -196,6 +198,7 @@ export class AuthService {
       user: {
         _id: String(user._id),
         email: user.email,
+        name: user.name,
         emailVerified: user.emailVerified,
         preferences: user.preferences,
         timezone: user.timezone,
