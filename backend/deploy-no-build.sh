@@ -9,10 +9,9 @@ set -e
 
 echo "🚀 Starting deployment (no build step)..."
 
+# Go directly to backend directory
+# NOTE: Files are already copied by GitHub Actions via SCP
 cd /root/POOSD/POOSD-LargeProject_Team12/backend
-
-echo "📥 Pulling latest code..."
-git pull origin main
 
 echo "📦 Installing production dependencies..."
 npm ci --omit=dev

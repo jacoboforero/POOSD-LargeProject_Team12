@@ -16,8 +16,8 @@ const authService = new AuthService();
 router.post("/register", ipRateLimit, async (req, res, next) => {
   try {
     const {
-      email,
       name,
+      email,
       topics = [],
       interests = [],
       jobIndustry,
@@ -30,7 +30,7 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       scrollPastTopics = []
     } = req.body;
 
-    await authService.register(email, name, {
+    await authService.register(email, {
       topics: Array.isArray(topics) ? topics : [],
       interests: Array.isArray(interests) ? interests : [],
       jobIndustry,
@@ -41,7 +41,7 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       newsScope,
       preferredHeadlines: Array.isArray(preferredHeadlines) ? preferredHeadlines : [],
       scrollPastTopics: Array.isArray(scrollPastTopics) ? scrollPastTopics : [],
-    });
+    }, name);
     
     res.status(201).json({
       success: true,

@@ -1,8 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IUser extends Document {
-  email: string;
   name?: string;
+  email: string;
   emailVerified: boolean;
   otp?: {
     hash: string;
@@ -47,10 +47,10 @@ export interface IUser extends Document {
 }
 
 const UserSchema = new Schema<IUser>({
-  email: { type: String, required: true, lowercase: true },
   name: { type: String },
+  email: { type: String, required: true, lowercase: true },
   emailVerified: { type: Boolean, default: false },
-  
+
   otp: {
     hash: String,
     expiresAt: Date,

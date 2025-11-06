@@ -8,7 +8,8 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://129.212.183.227:3001',
+        // Use environment variable or fallback to localhost for development
+        target: process.env.VITE_API_URL || 'http://localhost:3001',
         changeOrigin: true,
         secure: false,
       },

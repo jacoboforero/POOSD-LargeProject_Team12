@@ -1,68 +1,104 @@
 import { useState } from "react";
+import axios from "axios";
 import ReactMarkdown from "react-markdown";
-import { generateBriefing, getBriefingStatus, getBriefing } from "../services/authApi";
 
-interface LandingPageProps {
-  username: string;
-  token: string;
-}
-
-const LandingPage = ({ username, token }: LandingPageProps) => {
-  const [briefingContent, setBriefingContent] = useState<string | null>(null);
+const LandingPage = ({ username }: { username: string }) => {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<string>("idle");
+  const [briefingId, setBriefingId] = useState<string | null>(null);
+  const [briefingContent, setBriefingContent] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>("idle"); // idle, queued, fetching, summarizing, done, error
 
-  const handleGenerateBriefing = async () => {
+  const generateBriefing = async () => {
     setIsGenerating(true);
     setBriefingContent(null);
-    setError(null);
+    setErrorMessage(null);
     setStatus("queued");
 
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found. Please log in again.");
+      }
+
       // Step 1: Start generation
-      const response = await generateBriefing(token);
-      const briefingId = response.briefingId;
+      const response = await axios.post(
+        "/api/briefings/generate",
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("DEBUG: Generate response =", response.data);
+
+      const briefingId = response.data.briefingId;
 
       if (briefingId) {
+        setBriefingId(briefingId);
         // Step 2: Poll for completion
-        await pollBriefingStatus(briefingId);
+        await pollBriefingStatus(briefingId, token);
       } else {
         throw new Error("Failed to start briefing generation - no briefingId in response");
       }
-    } catch (err: any) {
-      console.error("Briefing generation failed:", err);
-      setError(err.message || "Failed to generate briefing. Please try again.");
-      setStatus("error");
+    } catch (error: any) {
+      console.error("Generate briefing error:", error);
+      const message = error.response?.data?.error?.details ||
+                      error.response?.data?.error?.message ||
+                      error.message ||
+                      "Failed to generate briefing. Please try again.";
+      setErrorMessage(message);
       setIsGenerating(false);
+      setStatus("error");
     }
   };
 
-  const pollBriefingStatus = async (briefingId: string) => {
-    const maxAttempts = 60;
+  const pollBriefingStatus = async (briefingId: string, token: string) => {
+    const maxAttempts = 60; // Poll for up to 2 minutes
     let attempts = 0;
 
     while (attempts < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000)); // Wait 2 seconds
 
       try {
-        const statusResponse = await getBriefingStatus(briefingId, token);
-        const currentStatus = statusResponse.status;
+        const statusResponse = await axios.get(
+          `/api/briefings/${briefingId}/status`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-        setStatus(currentStatus);
+        console.log("DEBUG: Status response =", statusResponse.data);
 
-        if (currentStatus === "done") {
-          await fetchCompleteBriefing(briefingId);
-          break;
-        } else if (currentStatus === "error") {
-          const reason = statusResponse.statusReason || "Unknown error";
-          throw new Error(`Briefing generation failed: ${reason}`);
+        const currentStatus = statusResponse.data.status;
+        const progress = statusResponse.data.progress || 0;
+
+        if (currentStatus) {
+          setStatus(currentStatus);
+
+          if (currentStatus === "done") {
+            // Fetch the complete briefing
+            await fetchCompleteBriefing(briefingId, token);
+            break;
+          } else if (currentStatus === "error") {
+            const reason = statusResponse.data.statusReason || "Unknown error";
+            throw new Error(`Briefing generation failed: ${reason}`);
+          }
         }
-      } catch (err: any) {
-        console.error("Status check failed:", err);
-        setError(err.message || "Failed to check briefing status.");
-        setStatus("error");
+      } catch (error: any) {
+        console.error("Poll status error:", error);
+        const message = error.response?.data?.error?.details ||
+                        error.response?.data?.error?.message ||
+                        error.message ||
+                        "Failed to check briefing status";
+        setErrorMessage(message);
         setIsGenerating(false);
+        setStatus("error");
         break;
       }
 
@@ -70,40 +106,54 @@ const LandingPage = ({ username, token }: LandingPageProps) => {
     }
 
     if (attempts >= maxAttempts && status !== "done") {
-      setError("Briefing generation timed out. Please try again.");
-      setStatus("error");
+      setErrorMessage("Briefing generation timed out. Please try again.");
       setIsGenerating(false);
+      setStatus("error");
     }
   };
 
-  const fetchCompleteBriefing = async (briefingId: string) => {
+  const fetchCompleteBriefing = async (briefingId: string, token: string) => {
     try {
-      const response = await getBriefing(briefingId, token);
+      const response = await axios.get(`/api/briefings/${briefingId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-      if (response.summary) {
-        const sections = response.summary.sections || [];
-        let content = "";
+      console.log("DEBUG: Briefing response =", response.data);
 
-        for (const section of sections) {
-          if (section.category) {
-            content += `📰 ${section.category.toUpperCase()}\n\n`;
-          }
-          if (section.text) {
-            content += `${section.text}\n\n`;
-          }
-        }
+      if (response.data.summary) {
+        const sections = response.data.summary.sections || [];
+
+        // Build briefing content from sections
+        const content = sections
+          .map((section: any) => {
+            let text = "";
+            if (section.category) {
+              text += `📰 ${section.category.toUpperCase()}\n\n`;
+            }
+            if (section.text) {
+              text += `${section.text}\n\n`;
+            }
+            return text;
+          })
+          .join("");
 
         setBriefingContent(content.trim());
+        setIsGenerating(false);
         setStatus("done");
       } else {
         throw new Error("Invalid briefing data - no summary found");
       }
-    } catch (err: any) {
-      console.error("Failed to fetch briefing:", err);
-      setError(err.message || "Failed to load briefing.");
-      setStatus("error");
-    } finally {
+    } catch (error: any) {
+      console.error("Fetch briefing error:", error);
+      const message = error.response?.data?.error?.details ||
+                      error.response?.data?.error?.message ||
+                      error.message ||
+                      "Failed to fetch briefing";
+      setErrorMessage(message);
       setIsGenerating(false);
+      setStatus("error");
     }
   };
 
@@ -127,17 +177,17 @@ const LandingPage = ({ username, token }: LandingPageProps) => {
   return (
     <div className="landing-page">
       <div className="landing-header">
-        <h1>Welcome back, {username}!</h1>
+        <h1>Welcome back, {username}</h1>
       </div>
 
       <div className="landing-content">
         {/* Generate Briefing Button */}
         {!isGenerating && !briefingContent && (
-          <div style={{ textAlign: "center", marginBottom: "2rem" }}>
+          <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
             <button
-              onClick={handleGenerateBriefing}
               className="auth-button"
-              style={{ fontSize: "18px", padding: "15px 30px" }}
+              onClick={generateBriefing}
+              style={{ marginBottom: "2rem", maxWidth: "400px" }}
             >
               📰 Generate Briefing
             </button>
@@ -148,40 +198,7 @@ const LandingPage = ({ username, token }: LandingPageProps) => {
         {isGenerating && (
           <div className="personal-briefing" style={{ textAlign: "center" }}>
             <div style={{ marginBottom: "1rem" }}>
-              <div
-                style={{
-                  width: "80px",
-                  height: "80px",
-                  margin: "0 auto 1rem",
-                  backgroundColor: "#333",
-                  borderRadius: "8px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "40px",
-                }}
-              >
-                📰
-              </div>
-              <div
-                style={{
-                  border: "4px solid #f3f3f3",
-                  borderTop: "4px solid #333",
-                  borderRadius: "50%",
-                  width: "40px",
-                  height: "40px",
-                  animation: "spin 1s linear infinite",
-                  margin: "0 auto 1rem",
-                }}
-              />
-              <style>
-                {`
-                  @keyframes spin {
-                    0% { transform: rotate(0deg); }
-                    100% { transform: rotate(360deg); }
-                  }
-                `}
-              </style>
+              <div className="loading-spinner"></div>
             </div>
             <h3>{getStatusMessage()}</h3>
             <p style={{ fontStyle: "italic", color: "#666" }}>
@@ -192,43 +209,38 @@ const LandingPage = ({ username, token }: LandingPageProps) => {
 
         {/* Briefing Content */}
         {briefingContent && (
-          <div className="personal-briefing">
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <div className="personal-briefing" style={{ width: "100%", maxWidth: "900px", margin: "0 auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2>🗞️ Your Briefing</h2>
               <button
-                onClick={handleGenerateBriefing}
                 className="auth-button"
-                style={{ padding: "8px 16px", fontSize: "14px" }}
+                onClick={generateBriefing}
+                style={{ padding: "0.5rem 1rem" }}
               >
                 🔄 Refresh
               </button>
             </div>
-            <div style={{ lineHeight: "1.6" }}>
+            <div style={{ lineHeight: "1.8", fontFamily: "Georgia, serif", fontSize: "1.05rem" }}>
               <ReactMarkdown>{briefingContent}</ReactMarkdown>
             </div>
           </div>
         )}
 
         {/* Error Message */}
-        {error && (
+        {errorMessage && (
           <div
             style={{
               padding: "1rem",
-              backgroundColor: "#ffebee",
-              border: "1px solid #ef5350",
+              backgroundColor: "rgba(255, 0, 0, 0.1)",
+              border: "1px solid rgba(255, 0, 0, 0.3)",
               borderRadius: "4px",
               marginTop: "1rem",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", marginBottom: "0.5rem" }}>
-              <span style={{ color: "#d32f2f", marginRight: "0.5rem" }}>⚠️</span>
-              <span style={{ color: "#d32f2f" }}>{error}</span>
-            </div>
-            <button
-              onClick={handleGenerateBriefing}
-              className="auth-button"
-              style={{ marginTop: "0.5rem" }}
-            >
+            <p style={{ color: "red", marginBottom: "1rem" }}>
+              ⚠️ {errorMessage}
+            </p>
+            <button className="auth-button" onClick={generateBriefing}>
               Try Again
             </button>
           </div>

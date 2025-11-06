@@ -2,12 +2,13 @@ import { useState } from 'react';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
+import VerifyOtp from './components/VerifyOtp';
 import './App.css';
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<'login' | 'register' | 'landing'>('login');
+  const [currentPage, setCurrentPage] = useState<'login' | 'register' | 'verify' | 'landing'>('login');
   const [username, setUsername] = useState<string>('');
-  const [token, setToken] = useState<string>('');
+  const [userEmail, setUserEmail] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
 
   return (
@@ -26,10 +27,9 @@ function App() {
                 setSuccessMessage('');
                 setCurrentPage('register');
               }}
-              onLogin={(email, authToken) => {
-                setUsername(email);
-                setToken(authToken);
-                setCurrentPage('landing');
+              onLogin={(email) => {
+                setUserEmail(email);
+                setCurrentPage('verify');
               }}
               successMessage={successMessage}
             />
@@ -38,15 +38,25 @@ function App() {
           {currentPage === 'register' && (
             <RegisterPage
               onNavigateToLogin={() => setCurrentPage('login')}
-              onRegister={(email, authToken) => {
-                setUsername(email);
-                setToken(authToken);
-                setCurrentPage('landing');
+              onRegister={(email) => {
+                setUserEmail(email);
+                setCurrentPage('verify');
               }}
             />
           )}
 
-          {currentPage === 'landing' && <LandingPage username={username} token={token} />}
+          {currentPage === 'verify' && (
+            <VerifyOtp
+              email={userEmail}
+              onVerified={(name) => {
+                setUsername(name);
+                setCurrentPage('landing');
+              }}
+              onBack={() => setCurrentPage('login')}
+            />
+          )}
+
+          {currentPage === 'landing' && <LandingPage username={username} />}
         </main>
       </div>
     </div>

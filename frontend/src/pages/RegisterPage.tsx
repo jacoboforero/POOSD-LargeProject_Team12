@@ -15,7 +15,7 @@ import Register from '../components/Register';
  */
 interface Props {
   onNavigateToLogin?: () => void;
-  onRegister?: (email: string, token: string) => void;
+  onRegister?: (email: string) => void;
 }
 
 const RegisterPage = ({ onNavigateToLogin, onRegister }: Props) => {

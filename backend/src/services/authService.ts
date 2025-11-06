@@ -9,7 +9,6 @@ export class AuthService {
    */
   async register(
     email: string,
-    name?: string,
     preferences?: {
       topics?: string[];
       interests?: string[];
@@ -21,7 +20,8 @@ export class AuthService {
       newsScope?: string;
       preferredHeadlines?: string[];
       scrollPastTopics?: string[];
-    }
+    },
+    name?: string
   ): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -38,8 +38,8 @@ export class AuthService {
 
     // Create new user with preferences
     const user = await UserModel.create({
+      name: name?.trim(),
       email: normalizedEmail,
-      name: name,
       emailVerified: false,
       preferences: {
         topics: preferences?.topics || [],
@@ -71,6 +71,9 @@ export class AuthService {
     });
 
     console.log(`\n🆕 NEW USER REGISTRATION`);
+    if (name) {
+      console.log(`👤 Name: ${name}`);
+    }
     console.log(`📧 Email: ${normalizedEmail}`);
     console.log(`🔑 OTP Code: ${code}`);
     console.log(`📋 Preferences:`);
@@ -197,8 +200,8 @@ export class AuthService {
       token,
       user: {
         _id: String(user._id),
-        email: user.email,
         name: user.name,
+        email: user.email,
         emailVerified: user.emailVerified,
         preferences: user.preferences,
         timezone: user.timezone,
