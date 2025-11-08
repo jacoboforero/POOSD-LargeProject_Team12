@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import path from "path";
+import fs from "fs";
 import { RequestWithId } from "./types/request";
 
 // Import middleware
@@ -60,6 +62,24 @@ app.get("/health", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/me", userRoutes);
 app.use("/api/briefings", briefingRoutes);
+
+// Serve built frontend if available so the IP serves the web app directly
+const frontendDistPath = path.resolve(__dirname, "../../../frontend/dist");
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
+
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) {
+      return next();
+    }
+
+    res.sendFile(path.join(frontendDistPath, "index.html"), (err) => {
+      if (err) {
+        next(err);
+      }
+    });
+  });
+}
 
 // 404 handler
 app.use("*", (req, res) => {
