@@ -205,14 +205,27 @@ export class AuthService {
     await user.save();
 
     // Send login OTP email
-    await this.emailService.sendLoginOTP(normalizedEmail, code);
-
-    console.log(`\n🔐 USER LOGIN WITH PASSWORD`);
-    console.log(`📧 Email: ${normalizedEmail}`);
-    console.log(`✅ Password verified`);
-    console.log(`✉️  OTP sent via email`);
-    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
-    console.log(`---\n`);
+    try {
+      await this.emailService.sendLoginOTP(normalizedEmail, code);
+      
+      console.log(`\n🔐 USER LOGIN WITH PASSWORD`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`✅ Password verified`);
+      console.log(`✉️  OTP sent via email`);
+      console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+      console.log(`---\n`);
+    } catch (error) {
+      // Log the OTP to console as fallback
+      console.log(`\n🔐 USER LOGIN WITH PASSWORD`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`✅ Password verified`);
+      console.log(`⚠️  Email failed - OTP CODE: ${code}`);
+      console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+      console.log(`---\n`);
+      
+      // Re-throw the error so it gets sent to the frontend
+      throw error;
+    }
   }
 
   /**
@@ -243,13 +256,22 @@ export class AuthService {
     await user.save();
 
     // Send login OTP email
-    await this.emailService.sendLoginOTP(normalizedEmail, code);
-
-    console.log(`\n🔐 USER LOGIN`);
-    console.log(`📧 Email: ${normalizedEmail}`);
-    console.log(`✉️  OTP sent via email`);
-    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
-    console.log(`---\n`);
+    try {
+      await this.emailService.sendLoginOTP(normalizedEmail, code);
+      
+      console.log(`\n🔐 USER LOGIN`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`✉️  OTP sent via email`);
+      console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+      console.log(`---\n`);
+    } catch (error) {
+      console.log(`\n🔐 USER LOGIN`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`⚠️  Email failed - OTP CODE: ${code}`);
+      console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+      console.log(`---\n`);
+      throw error;
+    }
   }
 
   /**
@@ -356,13 +378,22 @@ export class AuthService {
     await user.save();
 
     // Send password reset OTP email
-    await this.emailService.sendPasswordResetOTP(normalizedEmail, code);
-
-    console.log(`\n🔐 PASSWORD RESET REQUEST`);
-    console.log(`📧 Email: ${normalizedEmail}`);
-    console.log(`✉️  Reset code sent via email`);
-    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
-    console.log(`---\n`);
+    try {
+      await this.emailService.sendPasswordResetOTP(normalizedEmail, code);
+      
+      console.log(`\n🔐 PASSWORD RESET REQUEST`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`✉️  Reset code sent via email`);
+      console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+      console.log(`---\n`);
+    } catch (error) {
+      console.log(`\n🔐 PASSWORD RESET REQUEST`);
+      console.log(`📧 Email: ${normalizedEmail}`);
+      console.log(`⚠️  Email failed - RESET CODE: ${code}`);
+      console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+      console.log(`---\n`);
+      throw error;
+    }
   }
 
   /**
