@@ -262,6 +262,38 @@ class ApiService {
     }
   }
 
+  /// Update user profile/preferences
+  Future<Map<String, dynamic>> updateUserProfile(Map<String, dynamic> payload) async {
+    try {
+      final token = await _storage.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found');
+      }
+
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/me'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(payload),
+      );
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final error = json.decode(response.body);
+        final message = error['error']?['details'] ??
+            error['error']?['message'] ??
+            'Failed to update profile';
+        throw Exception(message);
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
   /// Get user usage and quota information
   Future<Map<String, dynamic>> getUserUsage() async {
     try {
@@ -294,8 +326,8 @@ class ApiService {
     }
   }
 
-  /// Generate a new briefing
-  Future<Map<String, dynamic>> generateBriefing({
+  /// Generate the daily briefing (saved preferences)
+  Future<Map<String, dynamic>> generateDailyBriefing({
     List<String>? topics,
     List<String>? interests,
     String? jobIndustry,
@@ -315,7 +347,7 @@ class ApiService {
       if (demographic != null) body['demographic'] = demographic;
 
       final response = await http.post(
-        Uri.parse('$baseUrl/api/briefings/generate'),
+        Uri.parse('$baseUrl/api/briefings/generate-daily'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -331,6 +363,39 @@ class ApiService {
         final message = error['error']?['details'] ??
                        error['error']?['message'] ??
                        'Failed to generate briefing';
+        throw Exception(message);
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Run a custom news query with ad-hoc parameters
+  Future<Map<String, dynamic>> generateCustomNewsQuery(
+      Map<String, dynamic> payload) async {
+    try {
+      final token = await _storage.getToken();
+
+      if (token == null) {
+        throw Exception('No authentication token found');
+      }
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/briefings/generate'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: json.encode(payload),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 202) {
+        return json.decode(response.body);
+      } else {
+        final error = json.decode(response.body);
+        final message = error['error']?['details'] ??
+            error['error']?['message'] ??
+            'Failed to run custom news query';
         throw Exception(message);
       }
     } catch (e) {

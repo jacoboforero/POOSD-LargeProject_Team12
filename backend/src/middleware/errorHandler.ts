@@ -1,5 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { ErrorSchema, ERROR_CODES } from "../../../packages/contracts/src";
+import { EmailDeliveryError } from "../errors/EmailDeliveryError";
+import { logError, serializeError } from "../utils/logger";
+import { RequestWithId } from "../types/request";
 
 export const errorHandler = (
   err: any,
@@ -7,7 +10,7 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  console.error("Error:", err);
+  const requestId = (req as RequestWithId).requestId;
 
   // If response was already sent, delegate to default Express error handler
   if (res.headersSent) {
@@ -17,9 +20,18 @@ export const errorHandler = (
   let statusCode = 500;
   let errorCode: keyof typeof ERROR_CODES = "INTERNAL_ERROR";
   let message = "Internal server error";
+  let details: unknown = err.details || err.message;
 
   // Handle specific error types
-  if (err.name === "ValidationError") {
+  if (err instanceof EmailDeliveryError) {
+    statusCode = err.status;
+    errorCode = "PROVIDER_ERROR";
+    message = err.message;
+    details = {
+      ...err.metadata,
+      cause: err.cause ? serializeError(err.cause) : undefined,
+    };
+  } else if (err.name === "ValidationError") {
     statusCode = 400;
     errorCode = "VALIDATION_FAILED";
     message = "Validation failed";
@@ -45,12 +57,26 @@ export const errorHandler = (
     message = "Quota exceeded";
   }
 
+  const normalizedDetails =
+    typeof details === "object" && details !== null ? details : { info: details };
+
   const errorResponse = ErrorSchema.parse({
     error: {
       code: errorCode,
       message,
-      details: err.details || err.message,
+      details: {
+        requestId,
+        ...normalizedDetails,
+      },
     },
+  });
+
+  logError("request.error", {
+    requestId,
+    method: req.method,
+    path: req.originalUrl,
+    statusCode,
+    error: serializeError(err),
   });
 
   res.status(statusCode).json(errorResponse);

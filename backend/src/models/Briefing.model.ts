@@ -5,6 +5,7 @@ export interface IBriefing extends Document {
   status: 'queued' | 'fetching' | 'summarizing' | 'done' | 'error';
   statusReason?: string;
   request: {
+    mode?: 'daily' | 'custom' | 'custom_news_query';
     topics?: string[];
     interests?: string[];
     jobIndustry?: string;
@@ -15,6 +16,17 @@ export interface IBriefing extends Document {
     newsScope?: string;
     preferredHeadlines?: string[];
     scrollPastTopics?: string[];
+    query?: string;
+    includeKeywords?: string[];
+    excludeKeywords?: string[];
+    sources?: string[];
+    preferredSources?: string[];
+    language?: string;
+    timeRangeHours?: number;
+    sortBy?: string;
+    summaryTone?: string;
+    summaryStyle?: string;
+    format?: string;
     source: string;
   };
   articles: Array<{
@@ -85,6 +97,7 @@ const BriefingSchema = new Schema<IBriefing>({
   statusReason: String,
 
   request: {
+    mode: { type: String, enum: ['daily', 'custom', 'custom_news_query'], default: 'daily' },
     topics: [String],
     interests: [String],
     jobIndustry: String,
@@ -95,6 +108,17 @@ const BriefingSchema = new Schema<IBriefing>({
     newsScope: String,
     preferredHeadlines: [String],
     scrollPastTopics: [String],
+    query: String,
+    includeKeywords: [String],
+    excludeKeywords: [String],
+    sources: [String],
+    preferredSources: [String],
+    language: String,
+    timeRangeHours: Number,
+    sortBy: String,
+    summaryTone: String,
+    summaryStyle: String,
+    format: String,
     source: { type: String, default: 'news_api' },
   },
 

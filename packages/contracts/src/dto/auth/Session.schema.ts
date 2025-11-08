@@ -5,6 +5,7 @@ export const SessionSchema = z.object({
   token: z.string(),
   user: UserSchema.pick({
     _id: true,
+    name: true,
     email: true,
     emailVerified: true,
     preferences: true,

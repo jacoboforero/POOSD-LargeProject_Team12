@@ -121,6 +121,167 @@ export class NewsService {
       return []; // Return empty array on error
     }
   }
+
+  async fetchCustomArticles(options: FetchCustomArticlesOptions): Promise<Article[]> {
+    const preferredSources =
+      options.preferredSources?.length
+        ? options.preferredSources.join(",")
+        : await this.getNewsSources(options.topics || []);
+
+    const params = this.buildCustomArticleParams(options, preferredSources);
+
+    try {
+      return await this.requestCustomArticles(params);
+    } catch (error: any) {
+      const limitDate = this.extractAllowedFromDate(error);
+      if (limitDate) {
+        console.warn(
+          `News API limited historical access to ${limitDate.toISOString().split("T")[0]} onwards. Adjusting window and retrying...`
+        );
+        const adjustedParams = this.applyAdjustedWindow(params, limitDate);
+        try {
+          return await this.requestCustomArticles(adjustedParams);
+        } catch (retryError) {
+          console.error("Custom news fetch retry failed:", retryError);
+        }
+      } else {
+        console.error("Custom news fetch failed:", error);
+      }
+
+      return [];
+    }
+  }
+
+  private buildQuery(options: FetchCustomArticlesOptions) {
+    const clauses: string[] = [];
+
+    if (options.topics?.length) {
+      clauses.push(`(${options.topics.join(" OR ")})`);
+    }
+
+    if (options.includeKeywords?.length) {
+      const include = options.includeKeywords.map((kw) => `"${kw}"`).join(" OR ");
+      clauses.push(`(${include})`);
+    }
+
+    let query = clauses.length > 0 ? clauses.join(" AND ") : "news";
+
+    if (options.excludeKeywords?.length) {
+      const exclude = options.excludeKeywords.map((kw) => `-"${kw}"`).join(" ");
+      query = `${query} ${exclude}`.trim();
+    }
+
+    return query;
+  }
+
+  private buildCustomArticleParams(
+    options: FetchCustomArticlesOptions,
+    preferredSources?: string
+  ) {
+    const params: Record<string, any> = {
+      q: this.buildQuery(options),
+      apiKey: this.apiKey,
+      language: options.language || "en",
+      sortBy: "publishedAt",
+      pageSize: options.pageSize || 30,
+    };
+
+    if (preferredSources) {
+      params.sources = preferredSources;
+    }
+
+    if (options.timeRangeHours) {
+      const to = new Date();
+      const from = new Date(Date.now() - options.timeRangeHours * 60 * 60 * 1000);
+      params.from = from.toISOString();
+      params.to = to.toISOString();
+    }
+
+    return params;
+  }
+
+  private async requestCustomArticles(params: Record<string, any>): Promise<Article[]> {
+    const response = await axios.get(`${this.baseUrl}/everything`, {
+      params,
+      timeout: 10000,
+    });
+
+    return (
+      response.data.articles
+        ?.filter((article: any) => article.title && article.description)
+        .map((article: any) => ({
+          title: article.title,
+          description: article.description,
+          url: article.url,
+          source: {
+            name: article.source?.name || "Unknown",
+            url: article.url,
+          },
+          publishedAt: new Date(article.publishedAt),
+          imageUrl: article.urlToImage,
+        })) || []
+    );
+  }
+
+  private extractAllowedFromDate(error: any): Date | null {
+    if (!axios.isAxiosError(error) || !error.response) {
+      return null;
+    }
+
+    const payload = error.response.data;
+    const candidates: string[] = [];
+
+    if (typeof payload === "string") {
+      candidates.push(payload);
+    } else if (payload) {
+      const possibleMessages = [
+        payload.message,
+        payload.error,
+        payload.error?.message,
+        payload.error?.details,
+      ];
+      possibleMessages.forEach((msg) => {
+        if (typeof msg === "string") {
+          candidates.push(msg);
+        }
+      });
+    }
+
+    candidates.push(error.message);
+
+    for (const message of candidates) {
+      const match = message?.match(/as far back as (\d{4}-\d{2}-\d{2})/i);
+      if (match?.[1]) {
+        const parsed = new Date(`${match[1]}T00:00:00.000Z`);
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private applyAdjustedWindow(
+    params: Record<string, any>,
+    minDate: Date
+  ): Record<string, any> {
+    const updatedParams = { ...params };
+    const originalFrom = params.from ? new Date(params.from) : null;
+    const now = new Date();
+
+    const dayBufferMs = 24 * 60 * 60 * 1000; // move at least one full day past limit
+    const minAllowed = new Date(minDate.getTime() + dayBufferMs);
+    const adjustedStart =
+      originalFrom && originalFrom > minAllowed ? originalFrom : minAllowed;
+    const safeStart =
+      adjustedStart > now ? new Date(now.getTime() - dayBufferMs) : adjustedStart;
+
+    updatedParams.from = safeStart.toISOString();
+    updatedParams.to = now.toISOString();
+
+    return updatedParams;
+  }
 }
 
 /**
@@ -136,4 +297,14 @@ export interface Article {
   };
   publishedAt: Date;
   imageUrl?: string;
+}
+
+export interface FetchCustomArticlesOptions {
+  topics?: string[];
+  includeKeywords?: string[];
+  excludeKeywords?: string[];
+  preferredSources?: string[];
+  language?: string;
+  timeRangeHours?: number;
+  pageSize?: number;
 }

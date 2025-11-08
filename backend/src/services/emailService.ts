@@ -1,4 +1,7 @@
-import nodemailer from 'nodemailer';
+import nodemailer from "nodemailer";
+import { EmailDeliveryError } from "../errors/EmailDeliveryError";
+import { EmailMetadata } from "../types/context";
+import { logError, logInfo, serializeError } from "../utils/logger";
 
 export class EmailService {
   private transporter: nodemailer.Transporter;
@@ -19,13 +22,23 @@ export class EmailService {
   /**
    * Send registration OTP email
    */
-  async sendRegistrationOTP(email: string, code: string, name?: string): Promise<void> {
-    const greeting = name ? `Hi ${name}` : 'Hi there';
+  async sendRegistrationOTP(
+    email: string,
+    code: string,
+    name?: string,
+    metadata: EmailMetadata = {}
+  ): Promise<void> {
+    const greeting = name ? `Hi ${name}` : "Hi there";
+    const enrichedMetadata: EmailMetadata = {
+      ...metadata,
+      context: metadata.context || "registration_otp",
+      recipient: email,
+    };
 
     const mailOptions = {
       from: `"IntelliBrief" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'Welcome to IntelliBrief - Verify Your Email',
+      subject: "Welcome to IntelliBrief - Verify Your Email",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Welcome to IntelliBrief!</h2>
@@ -57,17 +70,27 @@ IntelliBrief - Your personalized daily briefing
       `,
     };
 
-    await this.sendEmail(mailOptions);
+    await this.sendEmail(mailOptions, enrichedMetadata);
   }
 
   /**
    * Send login OTP email
    */
-  async sendLoginOTP(email: string, code: string): Promise<void> {
+  async sendLoginOTP(
+    email: string,
+    code: string,
+    metadata: EmailMetadata = {}
+  ): Promise<void> {
+    const enrichedMetadata: EmailMetadata = {
+      ...metadata,
+      context: metadata.context || "login_otp",
+      recipient: email,
+    };
+
     const mailOptions = {
       from: `"IntelliBrief" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'IntelliBrief - Login Verification Code',
+      subject: "IntelliBrief - Login Verification Code",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Login to IntelliBrief</h2>
@@ -99,17 +122,27 @@ IntelliBrief - Your personalized daily briefing
       `,
     };
 
-    await this.sendEmail(mailOptions);
+    await this.sendEmail(mailOptions, enrichedMetadata);
   }
 
   /**
    * Send password reset OTP email
    */
-  async sendPasswordResetOTP(email: string, code: string): Promise<void> {
+  async sendPasswordResetOTP(
+    email: string,
+    code: string,
+    metadata: EmailMetadata = {}
+  ): Promise<void> {
+    const enrichedMetadata: EmailMetadata = {
+      ...metadata,
+      context: metadata.context || "password_reset",
+      recipient: email,
+    };
+
     const mailOptions = {
       from: `"IntelliBrief" <${process.env.SMTP_USER}>`,
       to: email,
-      subject: 'IntelliBrief - Password Reset Code',
+      subject: "IntelliBrief - Password Reset Code",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #333;">Reset Your Password</h2>
@@ -141,27 +174,44 @@ IntelliBrief - Your personalized daily briefing
       `,
     };
 
-    await this.sendEmail(mailOptions);
+    await this.sendEmail(mailOptions, enrichedMetadata);
   }
 
   /**
    * Send email with error handling
    */
-  private async sendEmail(mailOptions: nodemailer.SendMailOptions): Promise<void> {
+  private async sendEmail(
+    mailOptions: nodemailer.SendMailOptions,
+    metadata: EmailMetadata = {}
+  ): Promise<void> {
+    const logMetadata = {
+      ...metadata,
+      subject: mailOptions.subject,
+    };
+
     try {
       const info = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Email sent: ${info.messageId}`);
-      console.log(`📧 To: ${mailOptions.to}`);
+      logInfo("email.sent", {
+        ...logMetadata,
+        messageId: info.messageId,
+      });
     } catch (error) {
-      console.error('❌ Failed to send email:', error);
+      logError("email.failed", {
+        ...logMetadata,
+        error: serializeError(error),
+      });
       // Also log to console as fallback
-      console.log('\n⚠️ EMAIL FALLBACK - OTP CODE:');
+      console.log("\n⚠️ EMAIL FALLBACK - OTP CODE:");
       console.log(`📧 To: ${mailOptions.to}`);
       console.log(`📝 Subject: ${mailOptions.subject}`);
-      console.log('---\n');
+      console.log("---\n");
 
       // Re-throw error so the calling code knows email failed
-      throw new Error('Failed to send email. Please check your email configuration.');
+      throw new EmailDeliveryError(
+        "Failed to send email. Please check your email configuration.",
+        logMetadata,
+        error
+      );
     }
   }
 }

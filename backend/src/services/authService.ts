@@ -1,7 +1,10 @@
 import bcrypt from "bcrypt";
+import { Types } from "mongoose";
 import { UserModel } from "../models/User.model";
 import { generateToken } from "../utils/jwt";
 import { EmailService } from "./emailService";
+import { RequestContext } from "../types/context";
+import { logError, logInfo } from "../utils/logger";
 
 export class AuthService {
   private emailService: EmailService;
@@ -28,7 +31,8 @@ export class AuthService {
       scrollPastTopics?: string[];
     },
     name?: string,
-    password?: string
+    password?: string,
+    context?: RequestContext
   ): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -84,8 +88,35 @@ export class AuthService {
       },
     });
 
+    const userId = (user._id as Types.ObjectId).toString();
+
+    logInfo("registration.user_created", {
+      requestId: context?.requestId,
+      email: normalizedEmail,
+      userId,
+    });
+
     // Send registration OTP email
-    await this.emailService.sendRegistrationOTP(normalizedEmail, code, name);
+    try {
+      await this.emailService.sendRegistrationOTP(normalizedEmail, code, name, {
+        ...context,
+        userId,
+      });
+    } catch (error) {
+      await UserModel.deleteOne({ _id: user._id });
+      logError("registration.email_failed", {
+        requestId: context?.requestId,
+        email: normalizedEmail,
+        userId,
+      });
+      throw error;
+    }
+
+    logInfo("registration.email_dispatched", {
+      requestId: context?.requestId,
+      email: normalizedEmail,
+      userId,
+    });
 
     console.log(`\n🆕 NEW USER REGISTRATION`);
     if (name) {

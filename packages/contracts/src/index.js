@@ -34,6 +34,7 @@ __exportStar(require("./dto/auth/Session.schema"), exports);
 // dto - users
 __exportStar(require("./dto/users/Me.schema"), exports);
 __exportStar(require("./dto/users/PreferencesUpdate.schema"), exports);
+__exportStar(require("./dto/users/ProfileUpdate.schema"), exports);
 __exportStar(require("./dto/users/Usage.schema"), exports);
 __exportStar(require("./dto/users/Schedule.schema"), exports);
 __exportStar(require("./dto/users/PushToken.schema"), exports);

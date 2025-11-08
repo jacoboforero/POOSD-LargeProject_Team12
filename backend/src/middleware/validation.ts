@@ -14,17 +14,17 @@ export const validateRequest = (options: ValidationOptions) => {
     try {
       // Validate request body
       if (options.body) {
-        req.body = options.body.parse(req.body);
+        req.body = options.body.parse(req.body) as any;
       }
 
       // Validate query parameters
       if (options.query) {
-        req.query = options.query.parse(req.query);
+        req.query = options.query.parse(req.query) as any;
       }
 
       // Validate route parameters
       if (options.params) {
-        req.params = options.params.parse(req.params);
+        req.params = options.params.parse(req.params) as any;
       }
 
       next();
@@ -34,7 +34,7 @@ export const validateRequest = (options: ValidationOptions) => {
           error: {
             code: "VALIDATION_FAILED",
             message: "Validation failed",
-            details: error.errors,
+            details: error.issues,
           },
         });
         return res.status(400).json(errorResponse);
@@ -54,12 +54,12 @@ export const validateResponse = (schema: ZodSchema) => {
         return originalJson.call(this, validatedData);
       } catch (error) {
         if (error instanceof z.ZodError) {
-          console.error("Response validation failed:", error.errors);
+          console.error("Response validation failed:", error.issues);
           const errorResponse = ErrorSchema.parse({
             error: {
               code: "INTERNAL_ERROR",
               message: "Response validation failed",
-              details: error.errors,
+              details: error.issues,
             },
           });
           return originalJson.call(this, errorResponse);

@@ -8,6 +8,12 @@ exports.UserPreferencesSchema = zod_1.z.object({
     demographic: zod_1.z.string().optional(), // open-ended
     jobIndustry: zod_1.z.string().optional(), // open-ended
     interests: zod_1.z.array(zod_1.z.string()).default([]), // open-ended
+    location: zod_1.z.string().optional(), // city, state, or country
+    lifeStage: zod_1.z.string().optional(), // student, parent, retiree, etc.
+    newsStyle: zod_1.z.string().optional(), // summaries vs analysis
+    newsScope: zod_1.z.string().optional(), // global/local/both
+    preferredHeadlines: zod_1.z.array(zod_1.z.string()).default([]), // what grabs attention
+    scrollPastTopics: zod_1.z.array(zod_1.z.string()).default([]), // what users skip
 });
 exports.UserLimitsSchema = zod_1.z.object({
     dailyGenerateCap: zod_1.z.number().int().min(1).default(3),
@@ -28,10 +34,16 @@ exports.PushTokenSchema = zod_1.z.object({
 });
 exports.UserSchema = zod_1.z.object({
     _id: zod_1.z.string(), // ObjectId as string; keep flexible for clients
+    name: zod_1.z.string().optional(),
     email: zod_1.z.string().email(),
     emailVerified: zod_1.z.boolean().default(false),
     otp: exports.OtpStateSchema.optional(),
-    preferences: exports.UserPreferencesSchema.default({ topics: [], interests: [] }),
+    preferences: exports.UserPreferencesSchema.default({
+        topics: [],
+        interests: [],
+        preferredHeadlines: [],
+        scrollPastTopics: [],
+    }),
     limits: exports.UserLimitsSchema,
     timezone: zod_1.z.string().optional(), // IANA, e.g., "America/New_York"
     notificationPrefs: zod_1.z

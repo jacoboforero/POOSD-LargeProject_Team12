@@ -1,5 +1,84 @@
 import React, { useState } from "react";
+import axios from "axios";
 import { registerUser } from "../services/authApi";
+
+const DEFAULT_ERROR_MESSAGE =
+  "Registration failed. Please try again or contact support if the issue persists.";
+
+interface ApiErrorPayload {
+  code?: string;
+  message?: string;
+  details?: unknown;
+}
+
+interface ApiErrorResponse {
+  error?: ApiErrorPayload;
+}
+
+const getMessageFromDetails = (details: unknown): string | undefined => {
+  if (!details) return undefined;
+  if (typeof details === "string") return details;
+  if (typeof details === "object") {
+    const detailObj = details as Record<string, unknown>;
+    if (typeof detailObj.message === "string") {
+      return detailObj.message;
+    }
+    if (
+      detailObj.cause &&
+      typeof detailObj.cause === "object" &&
+      typeof (detailObj.cause as Record<string, unknown>).message === "string"
+    ) {
+      return (detailObj.cause as Record<string, unknown>).message as string;
+    }
+  }
+  return undefined;
+};
+
+const buildProviderErrorMessage = (payload: ApiErrorPayload): string => {
+  const requestId =
+    payload.details &&
+    typeof payload.details === "object" &&
+    typeof (payload.details as Record<string, unknown>).requestId === "string"
+      ? ((payload.details as Record<string, unknown>).requestId as string)
+      : undefined;
+
+  const reason =
+    payload.details &&
+    typeof payload.details === "object" &&
+    typeof (payload.details as Record<string, unknown>).cause === "object"
+      ? getMessageFromDetails(
+          (payload.details as Record<string, unknown>).cause
+        )
+      : undefined;
+
+  const base =
+    "We couldn't send the verification email through our mail provider. Please try again in a few minutes.";
+  const reasonText = reason ? ` Reason: ${reason}` : "";
+  const reference = requestId ? ` (Reference ID: ${requestId})` : "";
+  return `${base}${reasonText}${reference}`;
+};
+
+const getRegistrationErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError<ApiErrorResponse>(error)) {
+    const payload = error.response?.data?.error;
+    if (payload) {
+      if (payload.code === "PROVIDER_ERROR") {
+        return buildProviderErrorMessage(payload);
+      }
+      return (
+        getMessageFromDetails(payload.details) ||
+        payload.message ||
+        DEFAULT_ERROR_MESSAGE
+      );
+    }
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return DEFAULT_ERROR_MESSAGE;
+};
 
 interface RegisterProps {
   onNavigateToLogin?: () => void;
@@ -67,7 +146,7 @@ const Register = ({ onNavigateToLogin, onRegister, initialEmail = "" }: Register
       const topicsArray = parseArrayField(attentionGrabbers);
       const interestsArray = parseArrayField(generalInterests);
 
-      const response = await registerUser({
+      await registerUser({
         name: name.trim(),
         email,
         password: password,
@@ -82,14 +161,9 @@ const Register = ({ onNavigateToLogin, onRegister, initialEmail = "" }: Register
 
       // Registration successful, navigate to OTP verification
       if (onRegister) onRegister(email);
-    } catch (error: any) {
-      console.error("Registration failed:", error.response?.data || error.message);
-      const errorMessage = error.response?.data?.error?.details ||
-                          error.response?.data?.error?.message ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          "Registration failed. Please try again.";
-      setError(errorMessage);
+    } catch (error: unknown) {
+      console.error("Registration failed:", error);
+      setError(getRegistrationErrorMessage(error));
     } finally {
       setLoading(false);
     }

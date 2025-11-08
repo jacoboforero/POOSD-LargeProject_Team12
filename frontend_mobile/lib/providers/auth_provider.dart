@@ -133,13 +133,31 @@ class AuthProvider with ChangeNotifier {
   Future<void> fetchUserData() async {
     try {
       final response = await _apiService.getCurrentUser();
-      if (response['data'] != null) {
-        _userData = response['data'];
-        notifyListeners();
-      }
+      _userData = response;
+      notifyListeners();
     } catch (e) {
       // Silently fail - user data is optional
       debugPrint('Failed to fetch user data: $e');
+    }
+  }
+
+  /// Update user profile/preferences
+  Future<bool> updateUserProfile(Map<String, dynamic> payload) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.updateUserProfile(payload);
+      _userData = response;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 

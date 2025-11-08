@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import AuthScreen from './components/AuthScreen';
 import RegisterPage from './pages/RegisterPage';
 import LandingPage from './pages/LandingPage';
@@ -14,6 +14,39 @@ function App() {
   const [userEmail, setUserEmail] = useState<string>('');
   const [resetCode, setResetCode] = useState<string>('');
   const [successMessage, setSuccessMessage] = useState<string>('');
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      return;
+    }
+
+    try {
+      const storedUserRaw = localStorage.getItem('user');
+      if (!storedUserRaw) {
+        setCurrentPage('landing');
+        return;
+      }
+
+      const storedUser = JSON.parse(storedUserRaw);
+      setUsername(storedUser.name || storedUser.email || '');
+      setUserEmail(storedUser.email || '');
+      setCurrentPage('landing');
+    } catch (error) {
+      console.warn('Failed to load stored user, clearing session.', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUsername('');
+    setUserEmail('');
+    setSuccessMessage('');
+    setCurrentPage('auth');
+  };
 
   const handleForgotPassword = async (email: string) => {
     try {
@@ -102,7 +135,7 @@ function App() {
             />
           )}
 
-          {currentPage === 'landing' && <LandingPage username={username} />}
+          {currentPage === 'landing' && <LandingPage username={username} onLogout={handleLogout} />}
         </main>
       </div>
     </div>

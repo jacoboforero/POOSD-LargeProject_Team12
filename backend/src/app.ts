@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import dotenv from "dotenv";
+import { RequestWithId } from "./types/request";
 
 // Import middleware
 import { requestId } from "./middleware/requestId";
@@ -31,8 +32,11 @@ app.use(
 // Request ID middleware
 app.use(requestId);
 
-// Logging
-app.use(morgan("combined"));
+// Logging with request IDs
+morgan.token("id", (req) => (req as RequestWithId).requestId || "-");
+app.use(
+  morgan(':method :url :status :res[content-length] - :response-time ms req_id=:id')
+);
 
 // Body parsing
 app.use(express.json({ limit: "10mb" }));

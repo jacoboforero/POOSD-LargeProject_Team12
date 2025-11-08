@@ -6,6 +6,12 @@ export const UserPreferencesSchema = z.object({
   demographic: z.string().optional(), // open-ended
   jobIndustry: z.string().optional(), // open-ended
   interests: z.array(z.string()).default([]), // open-ended
+  location: z.string().optional(), // city, state, or country
+  lifeStage: z.string().optional(), // student, parent, retiree, etc.
+  newsStyle: z.string().optional(), // summaries vs analysis
+  newsScope: z.string().optional(), // global/local/both
+  preferredHeadlines: z.array(z.string()).default([]), // what grabs attention
+  scrollPastTopics: z.array(z.string()).default([]), // what users skip
 });
 
 export const UserLimitsSchema = z.object({
@@ -30,11 +36,17 @@ export const PushTokenSchema = z.object({
 
 export const UserSchema = z.object({
   _id: z.string(), // ObjectId as string; keep flexible for clients
+  name: z.string().optional(),
   email: z.string().email(),
   emailVerified: z.boolean().default(false),
   otp: OtpStateSchema.optional(),
 
-  preferences: UserPreferencesSchema.default({ topics: [], interests: [] }),
+  preferences: UserPreferencesSchema.default({
+    topics: [],
+    interests: [],
+    preferredHeadlines: [],
+    scrollPastTopics: [],
+  }),
 
   limits: UserLimitsSchema,
 

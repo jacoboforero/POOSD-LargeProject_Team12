@@ -190,6 +190,72 @@ Get current user's profile.
 
 ---
 
+#### Update Profile & Preferences
+
+**PUT** `/api/me`
+
+Update the authenticated user's profile. Supports changing display name, timezone, notification settings, and all preference fields (topics, interests, industry, demographics, etc.). The email address cannot be updated through this endpoint.
+
+**Request:**
+
+```json
+{
+  "name": "Avery Patel",
+  "timezone": "America/Los_Angeles",
+  "notificationPrefs": {
+    "onBriefingReady": true
+  },
+  "preferences": {
+    "topics": ["technology", "markets"],
+    "interests": ["AI", "venture capital"],
+    "jobIndustry": "finance",
+    "demographic": "young professional",
+    "location": "San Francisco, CA",
+    "lifeStage": "young professional",
+    "newsStyle": "thoughtful analysis",
+    "newsScope": "global",
+    "preferredHeadlines": ["deep dives", "founder stories"],
+    "scrollPastTopics": ["celebrity gossip"]
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "_id": "6718a5c3f4e2b3a1d8e9f012",
+  "name": "Avery Patel",
+  "email": "user@example.com",
+  "emailVerified": true,
+  "preferences": {
+    "topics": ["technology", "markets"],
+    "interests": ["AI", "venture capital"],
+    "jobIndustry": "finance",
+    "demographic": "young professional",
+    "location": "San Francisco, CA",
+    "lifeStage": "young professional",
+    "newsStyle": "thoughtful analysis",
+    "newsScope": "global",
+    "preferredHeadlines": ["deep dives", "founder stories"],
+    "scrollPastTopics": ["celebrity gossip"]
+  },
+  "limits": {
+    "dailyGenerateCap": 3,
+    "generatedCountToday": 1,
+    "resetAt": "2025-10-24T00:00:00.000Z"
+  },
+  "timezone": "America/Los_Angeles",
+  "notificationPrefs": {
+    "onBriefingReady": true
+  },
+  "createdAt": "2025-10-23T12:00:00.000Z",
+  "updatedAt": "2025-10-23T12:10:00.000Z"
+}
+```
+
+---
+
 #### Get User Usage
 
 **GET** `/api/me/usage`
@@ -213,11 +279,11 @@ Get user's quota and usage statistics.
 
 ### Briefings
 
-#### Generate Briefing
+#### Generate Daily Briefing
 
-**POST** `/api/briefings/generate`
+**POST** `/api/briefings/generate-daily`
 
-Generate a new personalized news briefing.
+Generate the standard personalized briefing using the user's saved preferences. Optional overrides let you tweak topics/interests for a single run.
 
 **Headers:** Requires `Authorization: Bearer <token>`
 
@@ -241,6 +307,44 @@ Generate a new personalized news briefing.
 ```
 
 **Note:** Processing happens in background. Poll status endpoint to check completion.
+
+---
+
+#### Run Custom News Query
+
+**POST** `/api/briefings/generate`
+
+Create an ad-hoc news query with quick controls for topics, keywords, preferred sources, language, and output format. Use this for one-off research bursts.
+
+**Headers:** Requires `Authorization: Bearer <token>`
+
+**Request (all fields optional, combine as needed):**
+
+```json
+{
+  "topics": ["technology", "manufacturing"],
+  "includeKeywords": ["chips", "fabs"],
+  "excludeKeywords": ["rumor"],
+  "preferredSources": ["the-verge", "bloomberg"],
+  "language": "en",
+  "format": "bullet_points"
+}
+```
+
+**Response:**
+
+```json
+{
+  "briefingId": "6718a5c3f4e2b3a1d8e9f099"
+}
+```
+
+**Notes:**
+
+- `topics`, `includeKeywords`, `excludeKeywords`, and `preferredSources` accept comma-separated strings on the client (converted to arrays on the API).
+- `preferredSources` must use NewsAPI source IDs (e.g., `bloomberg`, `the-verge`).
+- `format` accepts `narrative` or `bullet_points`.
+- The query scans the last 90 days of coverage (roughly 3 months).
 
 ---
 

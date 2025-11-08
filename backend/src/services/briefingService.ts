@@ -3,6 +3,10 @@ import { BriefingModel } from "../models/Briefing.model";
 import { NewsService } from "./newsService";
 import { ArticleScraper } from "./articleScraper";
 import OpenAI from "openai";
+import {
+  BriefingGenerateRequest,
+  CustomNewsQueryRequest,
+} from "../../../packages/contracts/src";
 
 export class BriefingService {
   private newsService: NewsService;
@@ -25,7 +29,10 @@ export class BriefingService {
     return this.openai;
   }
 
-  async generate(userId: string, request: any = {}) {
+  async generateDailyBriefing(
+    userId: string,
+    request?: BriefingGenerateRequest
+  ) {
     const user = await UserModel.findById(userId);
 
     if (!user) {
@@ -42,16 +49,74 @@ export class BriefingService {
       throw new Error("Daily generation limit reached");
     }
 
+    const overrides = request || {};
+
     const briefing = await BriefingModel.create({
       userId,
       status: "queued",
       request: {
-        topics: request.topics || user.preferences.topics,
-        interests: request.interests || user.preferences.interests,
-        jobIndustry: request.jobIndustry || user.preferences.jobIndustry,
-        demographic: request.demographic || user.preferences.demographic,
+        mode: "daily",
+        topics: overrides.topics || user.preferences.topics,
+        interests: overrides.interests || user.preferences.interests,
+        jobIndustry: overrides.jobIndustry || user.preferences.jobIndustry,
+        demographic: overrides.demographic || user.preferences.demographic,
         source: "news_api",
       },
+      articles: [],
+      queuedAt: new Date(),
+    });
+
+    user.limits.generatedCountToday += 1;
+    await user.save();
+
+    this.processInBackground(String(briefing._id));
+
+    return { briefingId: String(briefing._id) };
+  }
+
+  async generateCustomNewsQuery(
+    userId: string,
+    request: CustomNewsQueryRequest
+  ) {
+    const user = await UserModel.findById(userId);
+
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    if (new Date() >= user.limits.resetAt) {
+      user.limits.generatedCountToday = 0;
+      user.limits.resetAt = this.getNextResetTime();
+      await user.save();
+    }
+
+    if (user.limits.generatedCountToday >= user.limits.dailyGenerateCap) {
+      throw new Error("Daily generation limit reached");
+    }
+
+    const timeRangeHours = 24 * 90; // 3 months
+    const sourceWindow = this.getSourceWindow(timeRangeHours);
+    const format = request.format || "narrative";
+
+    const briefing = await BriefingModel.create({
+      userId,
+      status: "queued",
+      request: {
+        mode: "custom_news_query",
+        topics: request.topics,
+        includeKeywords: request.includeKeywords,
+        excludeKeywords: request.excludeKeywords,
+        preferredSources: request.preferredSources,
+        sources: request.preferredSources,
+        language: request.language || "en",
+        timeRangeHours,
+        sortBy: "publishedAt",
+        summaryTone: "neutral",
+        format,
+        summaryStyle: format,
+        source: "news_api",
+      },
+      sourceWindow,
       articles: [],
       queuedAt: new Date(),
     });
@@ -143,6 +208,22 @@ export class BriefingService {
         // Step 2: Fetch articles from News API
         const articles = await this.fetchNewsArticles(briefing);
 
+        if (!articles.length) {
+          const message =
+            "No articles matched your request in the available time window. Try adjusting topics, keywords, or sources.";
+          briefing.status = "error";
+          briefing.statusReason = message;
+          briefing.error = { message };
+          briefing.progress = 100;
+          briefing.completedAt = new Date();
+          briefing.articles = [];
+          await briefing.save();
+          console.warn(
+            `⚠️  Briefing ${briefingId} had zero articles. Skipping summarization.`
+          );
+          return;
+        }
+
         // Step 3: Update status to 'summarizing'
         briefing.status = "summarizing";
         briefing.summarizeStartedAt = new Date();
@@ -204,17 +285,19 @@ export class BriefingService {
    */
   private async fetchNewsArticles(briefing: any): Promise<any[]> {
     try {
-      // Extract topics and interests from briefing request
-      const topics = briefing.request.topics || [];
-      const interests = briefing.request.interests || [];
-
-      // Fetch articles from News API
-      const articles = await this.newsService.fetchArticles(topics, interests);
+      const articles = await this.fetchArticlesForBriefing(briefing);
 
       // Basic validation
       const validArticles = articles.filter(
         (article) => article.title && article.url
       );
+
+      if (!validArticles.length) {
+        console.warn(
+          "⚠️  News API returned zero articles for this query. Skipping scraping."
+        );
+        return [];
+      }
 
       console.log(
         `📰 Fetched ${validArticles.length} articles, scraping until we get 3 with content...`
@@ -267,19 +350,9 @@ export class BriefingService {
 
       if (articlesWithContent.length === 0) {
         console.log(
-          `⚠️  Could not scrape any articles with sufficient content, using fallback`
+          `⚠️  Could not scrape any articles with sufficient content for briefing ${briefing._id}`
         );
-        return [
-          {
-            title: "Unable to scrape article content",
-            description:
-              "We found articles but couldn't extract full content. Please try again later.",
-            url: "#",
-            source: { name: "System" },
-            publishedAt: new Date(),
-            content: "",
-          },
-        ];
+        return [];
       }
 
       console.log(
@@ -290,19 +363,29 @@ export class BriefingService {
     } catch (error) {
       console.error("❌ Error fetching news articles:", error);
 
-      // Return fallback articles
-      return [
-        {
-          title: "News API temporarily unavailable",
-          description:
-            "We are experiencing issues with our news service. Please try again later.",
-          url: "#",
-          source: { name: "System" },
-          publishedAt: new Date(),
-          content: "",
-        },
-      ];
+      // Return empty set so caller can surface a friendly message
+      return [];
     }
+  }
+
+  private async fetchArticlesForBriefing(briefing: any) {
+    const mode = briefing.request?.mode || "daily";
+
+    if (mode === "custom" || mode === "custom_news_query") {
+      return this.newsService.fetchCustomArticles({
+        topics: briefing.request?.topics || [],
+        includeKeywords: briefing.request?.includeKeywords || [],
+        excludeKeywords: briefing.request?.excludeKeywords || [],
+        preferredSources:
+          briefing.request?.preferredSources || briefing.request?.sources || [],
+        language: briefing.request?.language || "en",
+        timeRangeHours: briefing.request?.timeRangeHours || 24,
+      });
+    }
+
+    const topics = briefing.request?.topics || [];
+    const interests = briefing.request?.interests || [];
+    return this.newsService.fetchArticles(topics, interests);
   }
 
   /**
@@ -407,23 +490,35 @@ export class BriefingService {
     const interests = request.interests || user.preferences.interests || [];
     const jobIndustry = request.jobIndustry || user.preferences.jobIndustry;
     const demographic = request.demographic || user.preferences.demographic;
+    const mode = request.mode || "daily";
+    const summaryTone = request.summaryTone || "direct";
+    const format = request.format || request.summaryStyle || "narrative";
 
-    let prompt = `Create a personalized news briefing based on the following information:
+    let prompt = `Create a personalized news briefing that is concise, fact-led, and clearly explains why each item matters to the reader. Avoid filler phrases, avoid repeating the prompt, and do not use hypey adjectives.
 
 ## User Context:
 - Topics of Interest: ${topics.join(", ") || "Not specified"}
 - Specific Interests: ${interests.join(", ") || "Not specified"}
 ${jobIndustry ? `- Job Industry: ${jobIndustry}` : ""}
 ${demographic ? `- Demographic: ${demographic}` : ""}
+${request.includeKeywords?.length ? `- Must highlight: ${request.includeKeywords.join(", ")}` : ""}
+${request.excludeKeywords?.length ? `- Avoid emphasis on: ${request.excludeKeywords.join(", ")}` : ""}
+${request.preferredSources?.length ? `- Preferred sources: ${request.preferredSources.join(", ")}` : request.sources?.length ? `- Preferred sources: ${request.sources.join(", ")}` : ""}
+${request.timeRangeHours ? `- Coverage window: last ${request.timeRangeHours} hours` : ""}
 
 ## Purpose:
-You are creating a personalized news briefing that summarizes ${
+You are creating a sharp digest that summarizes ${
       articles.length
-    } articles. Your summary should:
-1. Highlight the key points from each article
-2. Explain how each article relates to the user's areas of interest
-3. Provide context about why these articles matter to someone with these interests
-4. Create a cohesive narrative that ties the articles together
+    } articles. Your summary must:
+1. Capture only the most important new facts or developments from each article.
+2. Immediately tie those facts back to the user's interests (${topics.join(
+      ", "
+    )}${interests.length > 0 ? `, ${interests.join(", ")}` : ""}) or role (${jobIndustry || "general"}).
+3. State explicitly why this update matters (impact, risk, opportunity, next step).
+4. Stay laser-focused on clarity—no metaphors, no fluff.
+5. Match the requested tone (${summaryTone}) and output format (${
+      format === "bullet_points" ? "bullet points" : "narrative"
+    })
 
 ## Articles to Summarize:
 
@@ -448,15 +543,18 @@ ${article.content || article.description || "No content available"}
     });
 
     prompt += `## Instructions:
-Generate a well-structured briefing that:
-1. Starts with a brief overview connecting all articles to the user's interests
-2. Summarizes each article's key points
-3. Explains the relevance and implications for the user based on their interests (${topics.join(
-      ", "
-    )}${interests.length > 0 ? `, ${interests.join(", ")}` : ""})
-4. Maintains a professional but engaging tone
+Produce the output using these rules:
+1. Start with a single overview sentence (<=25 words) that summarizes the overall signal.
+2. ${
+      format === "bullet_points"
+        ? "List each article as a bullet. Begin with a short bolded fragment that captures the news, followed by a dash that explains in plain language why it matters to the reader."
+        : "Write short paragraphs (maximum 2 sentences each). The first sentence states the new development; the second sentence explains why it matters to the reader."
+    }
+3. Quote concrete numbers, dates, or names when available—never say \"recent\" if you can say \"Oct 12\".
+4. Do not add closing remarks or calls to action unless the source explicitly recommends one.
+5. Keep the total response under 220 words.
 
-Format your response as a single cohesive briefing text that flows naturally.`;
+Stay direct, confident, and informative.`;
 
     return prompt;
   }
@@ -509,6 +607,12 @@ Format your response as a single cohesive briefing text that flows naturally.`;
         text: summaryText.trim(),
       },
     ];
+  }
+
+  private getSourceWindow(hours: number) {
+    const to = new Date();
+    const from = new Date(Date.now() - hours * 60 * 60 * 1000);
+    return { from, to };
   }
 
   private getNextResetTime(): Date {

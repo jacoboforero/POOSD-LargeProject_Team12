@@ -11,6 +11,7 @@ export * from "./dto/auth/OtpVerify.schema";
 export * from "./dto/auth/Session.schema";
 export * from "./dto/users/Me.schema";
 export * from "./dto/users/PreferencesUpdate.schema";
+export * from "./dto/users/ProfileUpdate.schema";
 export * from "./dto/users/Usage.schema";
 export * from "./dto/users/Schedule.schema";
 export * from "./dto/users/PushToken.schema";

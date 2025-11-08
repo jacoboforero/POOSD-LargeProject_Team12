@@ -7,6 +7,7 @@ exports.SessionSchema = zod_1.z.object({
     token: zod_1.z.string(),
     user: User_schema_1.UserSchema.pick({
         _id: true,
+        name: true,
         email: true,
         emailVerified: true,
         preferences: true,

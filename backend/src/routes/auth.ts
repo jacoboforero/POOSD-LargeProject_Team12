@@ -8,9 +8,17 @@ import {
 import { AuthService } from "../services/authService";
 import { validateRequest, validateResponse } from "../middleware/validation";
 import { ipRateLimit } from "../middleware/rateLimiter";
+import { RequestContext } from "../types/context";
+import { RequestWithId } from "../types/request";
 
 const router = Router();
 const authService = new AuthService();
+
+const getRequestContext = (req: RequestWithId): RequestContext => ({
+  requestId: req.requestId,
+  ip: req.ip,
+  userAgent: req.get("user-agent") || undefined,
+});
 
 // POST /api/auth/check-user
 router.post("/check-user", ipRateLimit, async (req, res, next) => {
@@ -56,7 +64,7 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       newsScope,
       preferredHeadlines: Array.isArray(preferredHeadlines) ? preferredHeadlines : [],
       scrollPastTopics: Array.isArray(scrollPastTopics) ? scrollPastTopics : [],
-    }, name, password);
+    }, name, password, getRequestContext(req as RequestWithId));
 
     res.status(201).json({
       success: true,
