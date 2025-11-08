@@ -6,23 +6,95 @@ import 'storage_service.dart';
 /// Handles all HTTP requests to the backend server
 class ApiService {
   // Base URL - change this to your backend URL
-  static const String baseUrl = 'http://129.212.183.227:3001';
-  // For local development (iOS simulator), use: http://localhost:3001
-  // For Android emulator, use: http://10.0.2.2:3001
-  // For production, use: http://129.212.183.227:3001
+  // LOCAL DEVELOPMENT - Using localhost (change port to 3002 if needed)
+  static const String baseUrl = 'http://localhost:3001';
+
+  // ALTERNATIVE CONFIGURATIONS:
+  // For iOS simulator local development: http://localhost:3002
+  // For Android emulator local development: http://10.0.2.2:3002
+  // For production (remote server): http://129.212.183.227:3001
 
   final StorageService _storage = StorageService();
+
+  /// Check if user exists (for showing password field)
+  Future<bool> checkUserExists(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/check-user'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email}),
+      );
+
+      print('DEBUG API: Check user response status = ${response.statusCode}');
+      print('DEBUG API: Check user response body = ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['exists'] ?? false;
+      } else {
+        return false;
+      }
+    } catch (e) {
+      print('DEBUG API: Check user error: $e');
+      return false;
+    }
+  }
+
+  /// Login with email and password (sends OTP after verification)
+  Future<Map<String, dynamic>> loginWithPassword(String email, String password) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/login-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email': email,
+          'password': password,
+        }),
+      );
+
+      print('DEBUG API: Login password response status = ${response.statusCode}');
+      print('DEBUG API: Login password response body = ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final error = json.decode(response.body);
+        final message = error['error']?['details'] ??
+                       error['error']?['message'] ??
+                       'Login failed';
+        throw Exception(message);
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
 
   /// Register a new user with email and optional preferences
   Future<Map<String, dynamic>> register(
     String email, {
+    String? name,
     String? topics,
     String? interests,
     String? jobIndustry,
     String? demographic,
+    String? location,
+    String? lifeStage,
+    String? newsStyle,
+    String? newsScope,
+    String? password,
   }) async {
     try {
       final body = <String, dynamic>{'email': email};
+
+      // Add name if provided
+      if (name != null && name.isNotEmpty) {
+        body['name'] = name;
+      }
+
+      // Add password if provided
+      if (password != null && password.isNotEmpty) {
+        body['password'] = password;
+      }
 
       // Add preferences if provided - convert comma-separated strings to arrays
       if (topics != null && topics.isNotEmpty) {
@@ -36,6 +108,18 @@ class ApiService {
       }
       if (demographic != null && demographic.isNotEmpty) {
         body['demographic'] = demographic;
+      }
+      if (location != null && location.isNotEmpty) {
+        body['location'] = location;
+      }
+      if (lifeStage != null && lifeStage.isNotEmpty) {
+        body['lifeStage'] = lifeStage;
+      }
+      if (newsStyle != null && newsStyle.isNotEmpty) {
+        body['newsStyle'] = newsStyle;
+      }
+      if (newsScope != null && newsScope.isNotEmpty) {
+        body['newsScope'] = newsScope;
       }
 
       print('DEBUG API: Register body = ${json.encode(body)}');
@@ -327,5 +411,94 @@ class ApiService {
   Future<bool> isAuthenticated() async {
     final token = await _storage.getToken();
     return token != null;
+  }
+
+  /// Request password reset (sends OTP to console)
+  Future<Map<String, dynamic>> requestPasswordReset(String email) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'email': email.toLowerCase().trim()}),
+      );
+
+      print('DEBUG API: Forgot password response status = ${response.statusCode}');
+      print('DEBUG API: Forgot password response body = ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final error = json.decode(response.body);
+        final message = error['error']?['details'] ??
+                       error['error']?['message'] ??
+                       'Failed to send reset code';
+        throw Exception(message);
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Verify password reset code
+  Future<Map<String, dynamic>> verifyResetCode(String email, String code) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/verify-reset-code'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email': email.toLowerCase().trim(),
+          'code': code,
+        }),
+      );
+
+      print('DEBUG API: Verify reset code response status = ${response.statusCode}');
+      print('DEBUG API: Verify reset code response body = ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final error = json.decode(response.body);
+        final message = error['error']?['details'] ??
+                       error['error']?['message'] ??
+                       'Failed to verify reset code';
+        throw Exception(message);
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Reset password with verified code
+  Future<Map<String, dynamic>> resetPassword(
+    String email,
+    String code,
+    String newPassword,
+  ) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/reset-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'email': email.toLowerCase().trim(),
+          'code': code,
+          'newPassword': newPassword,
+        }),
+      );
+
+      print('DEBUG API: Reset password response status = ${response.statusCode}');
+      print('DEBUG API: Reset password response body = ${response.body}');
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        final error = json.decode(response.body);
+        final message = error['error']?['details'] ??
+                       error['error']?['message'] ??
+                       'Failed to reset password';
+        throw Exception(message);
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
   }
 }

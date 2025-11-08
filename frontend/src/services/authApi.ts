@@ -3,6 +3,7 @@ import axios from 'axios';
 export interface RegisterRequest {
   name: string;
   email: string;
+  password?: string;
   topics?: string[];
   interests?: string[];
   jobIndustry?: string;
@@ -42,6 +43,32 @@ export interface Session {
 }
 
 /**
+ * Check if user exists (for showing password field)
+ */
+export const checkUserExists = async (email: string): Promise<boolean> => {
+  try {
+    const response = await axios.post('/api/auth/check-user', {
+      email: email.toLowerCase().trim(),
+    });
+    return response.data.exists || false;
+  } catch (error) {
+    console.error('Error checking user:', error);
+    return false;
+  }
+};
+
+/**
+ * Login with email and password (sends OTP after verification)
+ */
+export const loginWithPassword = async (email: string, password: string): Promise<RegisterResponse> => {
+  const response = await axios.post<RegisterResponse>('/api/auth/login-password', {
+    email: email.toLowerCase().trim(),
+    password: password,
+  });
+  return response.data;
+};
+
+/**
  * Register a new user
  * Matches the backend schema: User model preferences and Briefing model request structure
  */
@@ -49,6 +76,7 @@ export const registerUser = async (data: RegisterRequest): Promise<RegisterRespo
   const response = await axios.post<RegisterResponse>('/api/auth/register', {
     name: data.name.trim(),
     email: data.email.toLowerCase().trim(),
+    password: data.password,
     topics: Array.isArray(data.topics) ? data.topics : (data.topics ? [data.topics] : []),
     interests: Array.isArray(data.interests) ? data.interests : (data.interests ? [data.interests] : []),
     jobIndustry: data.jobIndustry,
@@ -75,11 +103,44 @@ export const verifyOtp = async (data: VerifyRequest): Promise<Session> => {
 };
 
 /**
- * Login existing user
+ * Login existing user (legacy OTP method)
  */
 export const loginUser = async (email: string): Promise<RegisterResponse> => {
   const response = await axios.post<RegisterResponse>('/api/auth/login', {
     email: email.toLowerCase().trim(),
+  });
+  return response.data;
+};
+
+/**
+ * Request password reset (sends OTP code to console)
+ */
+export const requestPasswordReset = async (email: string): Promise<RegisterResponse> => {
+  const response = await axios.post<RegisterResponse>('/api/auth/forgot-password', {
+    email: email.toLowerCase().trim(),
+  });
+  return response.data;
+};
+
+/**
+ * Verify password reset code
+ */
+export const verifyResetCode = async (email: string, code: string): Promise<RegisterResponse> => {
+  const response = await axios.post<RegisterResponse>('/api/auth/verify-reset-code', {
+    email: email.toLowerCase().trim(),
+    code: code,
+  });
+  return response.data;
+};
+
+/**
+ * Reset password with verified code
+ */
+export const resetPassword = async (email: string, code: string, newPassword: string): Promise<RegisterResponse> => {
+  const response = await axios.post<RegisterResponse>('/api/auth/reset-password', {
+    email: email.toLowerCase().trim(),
+    code: code,
+    newPassword: newPassword,
   });
   return response.data;
 };

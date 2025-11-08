@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
+import '../services/api_service.dart';
 import 'onboarding_screen.dart';
 
 /// Unified Authentication Screen
 /// Handles both login and registration seamlessly
-/// - Enter email → tries to login
-/// - If user exists → show OTP field
+/// - Enter email → check if user exists
+/// - If user exists → show password field → verify password → show OTP field → login
 /// - If user doesn't exist → go to onboarding
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -17,106 +18,125 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  bool otpSent = false;
+  bool showPasswordField = false;
+  bool showOtpField = false;
+  bool isCheckingUser = false;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     _otpController.dispose();
     super.dispose();
   }
 
-  Future<void> _sendOtp() async {
+  Future<void> _handleEmailSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final email = _emailController.text.trim();
+    final apiService = ApiService();
 
-    // Try to login first (existing user)
-    bool success = await authProvider.login(email);
+    setState(() {
+      isCheckingUser = true;
+    });
 
-    if (success && mounted) {
-      // Existing user - show OTP field
-      setState(() {
-        otpSent = true;
-      });
+    try {
+      // Check if user exists
+      final userExists = await apiService.checkUserExists(email);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('OTP sent! Check your backend console for the code.'),
-          backgroundColor: AppTheme.darkGray,
-        ),
-      );
-    } else if (mounted && authProvider.errorMessage != null) {
-      // Debug: Print the actual error message
-      print('DEBUG: Error message = "${authProvider.errorMessage}"');
+      if (mounted) {
+        setState(() {
+          isCheckingUser = false;
+        });
 
-      // Check if error is "User not found" - means new user
-      final errorMsg = authProvider.errorMessage!.toLowerCase();
-      print('DEBUG: Lowercase error = "$errorMsg"');
-      print('DEBUG: Contains "not found"? ${errorMsg.contains('not found')}');
-      print('DEBUG: Contains "register"? ${errorMsg.contains('register')}');
+        if (userExists) {
+          // Existing user - show password field
+          setState(() {
+            showPasswordField = true;
+          });
+        } else {
+          // New user - navigate to onboarding
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('New user detected! Let\'s set up your preferences.'),
+              backgroundColor: AppTheme.darkGray,
+              duration: Duration(seconds: 2),
+            ),
+          );
 
-      if (errorMsg.contains('not found') ||
-          errorMsg.contains('register first') ||
-          errorMsg.contains('register') ||
-          errorMsg.contains('does not exist') ||
-          errorMsg.contains('no user')) {
-        // New user - navigate to onboarding
-        print('DEBUG: New user detected! Navigating to onboarding...');
-        authProvider.clearError();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('New user detected! Let\'s set up your preferences.'),
-            backgroundColor: AppTheme.darkGray,
-            duration: Duration(seconds: 2),
-          ),
-        );
-
-        // Navigate to onboarding after a brief delay
-        Future.delayed(const Duration(milliseconds: 500), () async {
-          if (mounted) {
-            final result = await Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => OnboardingScreen(email: email),
-              ),
-            );
-
-            // If onboarding completed and sent OTP, show OTP entry screen
-            if (result != null && result is Map && result['otpSent'] == true && mounted) {
-              setState(() {
-                otpSent = true;
-                _emailController.text = result['email'] ?? email;
-              });
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('OTP sent! Check your backend console for the code.'),
-                  backgroundColor: AppTheme.darkGray,
+          Future.delayed(const Duration(milliseconds: 500), () async {
+            if (mounted) {
+              final result = await Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => OnboardingScreen(email: email),
                 ),
               );
+
+              // If onboarding completed and OTP sent, show OTP field
+              if (result != null && result is Map && result['otpSent'] == true && mounted) {
+                setState(() {
+                  showOtpField = true;
+                  _emailController.text = result['email'] ?? email;
+                });
+              }
             }
-          }
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isCheckingUser = false;
         });
-      } else {
-        // Other error - show to user
-        print('DEBUG: Showing error to user: ${authProvider.errorMessage!}');
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${authProvider.errorMessage!}'),
+            content: Text('Error checking user: $e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
           ),
         );
       }
     }
   }
 
-  Future<void> _verifyOtp() async {
+  Future<void> _handlePasswordLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    final success = await authProvider.loginWithPassword(email, password);
+
+    if (success && mounted) {
+      // Password verified - show OTP field
+      setState(() {
+        showOtpField = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verification code sent to your email! Check your inbox.'),
+          backgroundColor: AppTheme.darkGray,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    } else if (mounted && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleOtpVerification() async {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -140,7 +160,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void _backToEmail() {
     setState(() {
-      otpSent = false;
+      showPasswordField = false;
+      showOtpField = false;
+      _passwordController.clear();
+      _otpController.clear();
+    });
+  }
+
+  void _backToPassword() {
+    setState(() {
+      showOtpField = false;
       _otpController.clear();
     });
   }
@@ -182,70 +211,26 @@ class _AuthScreenState extends State<AuthScreen> {
               children: [
                 // Title
                 Text(
-                  otpSent ? 'Enter Verification Code' : 'Welcome',
+                  showOtpField
+                      ? 'Enter Verification Code'
+                      : showPasswordField
+                          ? 'Welcome Back'
+                          : 'Welcome',
                   style: Theme.of(context).textTheme.displaySmall,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: AppTheme.spacingMedium),
 
-                if (!otpSent) ...[
-                  // Instruction text
+                if (showOtpField) ...[
+                  // OTP verification screen
                   Text(
-                    'Enter your email to continue',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: AppTheme.darkText.withValues(alpha: 0.7),
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: AppTheme.spacingLarge),
-
-                  // Email field
-                  _buildTextField(
-                    controller: _emailController,
-                    hint: 'Email',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    enabled: !authProvider.isLoading,
-                  ),
-                  const SizedBox(height: AppTheme.spacingLarge),
-
-                  // Send OTP button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: authProvider.isLoading ? null : _sendOtp,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppTheme.spacingXSmall,
-                        ),
-                        child: authProvider.isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppTheme.offWhite,
-                                  ),
-                                ),
-                              )
-                            : const Text(
-                                'Continue',
-                                style: TextStyle(fontSize: 16),
-                              ),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  // Instructions for OTP
-                  Text(
-                    'A 6-digit code has been sent to:\n${_emailController.text}',
+                    'A verification code has been sent to:\n${_emailController.text}',
                     style: Theme.of(context).textTheme.bodyMedium,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: AppTheme.spacingSmall),
                   Text(
-                    'Check your backend console for the code',
+                    'Check your email for the verification code',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontStyle: FontStyle.italic,
                           color: AppTheme.darkText.withValues(alpha: 0.7),
@@ -269,7 +254,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: authProvider.isLoading ? null : _verifyOtp,
+                      onPressed: authProvider.isLoading ? null : _handleOtpVerification,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(
                           vertical: AppTheme.spacingXSmall,
@@ -296,11 +281,149 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   // Back button
                   TextButton(
+                    onPressed: authProvider.isLoading ? null : _backToPassword,
+                    child: const Text(
+                      'Back to password',
+                      style: TextStyle(
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ] else if (showPasswordField) ...[
+                  // Password login screen
+                  Text(
+                    'Enter your password to continue',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.darkText.withValues(alpha: 0.7),
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppTheme.spacingLarge),
+
+                  // Email field (disabled)
+                  _buildTextField(
+                    controller: _emailController,
+                    hint: 'Email',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: false,
+                  ),
+                  const SizedBox(height: AppTheme.spacingMedium),
+
+                  // Password field
+                  _buildPasswordField(
+                    controller: _passwordController,
+                    hint: 'Password',
+                    icon: Icons.lock_outline,
+                    enabled: !authProvider.isLoading,
+                  ),
+                  const SizedBox(height: AppTheme.spacingSmall),
+
+                  // Forgot password button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: authProvider.isLoading ? null : () {
+                        Navigator.of(context).pushNamed(
+                          '/forgot-password',
+                          arguments: _emailController.text.trim(),
+                        );
+                      },
+                      child: const Text(
+                        'Forgot password?',
+                        style: TextStyle(
+                          fontSize: 14,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.spacingMedium),
+
+                  // Login button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: authProvider.isLoading ? null : _handlePasswordLogin,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppTheme.spacingXSmall,
+                        ),
+                        child: authProvider.isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppTheme.offWhite,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Continue',
+                                style: TextStyle(fontSize: 16),
+                              ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: AppTheme.spacingMedium),
+
+                  // Back button
+                  TextButton(
                     onPressed: authProvider.isLoading ? null : _backToEmail,
                     child: const Text(
                       'Back to email',
                       style: TextStyle(
                         decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  // Email entry screen
+                  Text(
+                    'Enter your email to continue',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.darkText.withValues(alpha: 0.7),
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppTheme.spacingLarge),
+
+                  // Email field
+                  _buildTextField(
+                    controller: _emailController,
+                    hint: 'Email',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    enabled: !authProvider.isLoading && !isCheckingUser,
+                  ),
+                  const SizedBox(height: AppTheme.spacingLarge),
+
+                  // Continue button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: (authProvider.isLoading || isCheckingUser) ? null : _handleEmailSubmit,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: AppTheme.spacingXSmall,
+                        ),
+                        child: (authProvider.isLoading || isCheckingUser)
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppTheme.offWhite,
+                                  ),
+                                ),
+                              )
+                            : const Text(
+                                'Continue',
+                                style: TextStyle(fontSize: 16),
+                              ),
                       ),
                     ),
                   ),
@@ -340,6 +463,43 @@ class _AuthScreenState extends State<AuthScreen> {
         }
         if (hint.contains('code') && value.length != 6) {
           return 'Code must be 6 digits';
+        }
+        return null;
+      },
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool enabled = true,
+  }) {
+    return TextFormField(
+      controller: controller,
+      obscureText: _obscurePassword,
+      enabled: enabled,
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, color: AppTheme.mutedTan),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+            color: AppTheme.mutedTan,
+          ),
+          onPressed: () {
+            setState(() {
+              _obscurePassword = !_obscurePassword;
+            });
+          },
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter your password';
+        }
+        if (value.length < 6) {
+          return 'Password must be at least 6 characters';
         }
         return null;
       },

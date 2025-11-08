@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { verifyOtp } from '../services/authApi';
+import { verifyResetCode } from '../services/authApi';
 
-interface VerifyOtpProps {
+interface ForgotPasswordProps {
   email: string;
-  onVerified: (userName: string) => void;
+  onCodeVerified: (code: string) => void;
   onBack?: () => void;
 }
 
-const VerifyOtp = ({ email, onVerified, onBack }: VerifyOtpProps) => {
+const ForgotPassword = ({ email, onCodeVerified, onBack }: ForgotPasswordProps) => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -17,24 +17,30 @@ const VerifyOtp = ({ email, onVerified, onBack }: VerifyOtpProps) => {
     setError('');
 
     if (!code) {
-      setError('Verification code is required.');
+      setError('Reset code is required.');
+      return;
+    }
+
+    if (code.length !== 6) {
+      setError('Code must be 6 digits.');
       return;
     }
 
     try {
       setLoading(true);
-      const session = await verifyOtp({ email, code });
+      await verifyResetCode(email, code);
 
-      // Store token and user info
-      localStorage.setItem('token', session.token);
-      localStorage.setItem('user', JSON.stringify(session.user));
-
-      // Pass the user's name (or email if name not available) to parent
-      const userName = session.user.name || session.user.email;
-      onVerified(userName);
+      // Code verified - proceed to reset password screen
+      if (onCodeVerified) {
+        onCodeVerified(code);
+      }
     } catch (error: any) {
       console.error('Verification failed:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.message || error.message || 'Verification failed. Please try again.';
+      const errorMessage = error.response?.data?.error?.details ||
+                          error.response?.data?.error?.message ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          'Verification failed. Please try again.';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -43,24 +49,31 @@ const VerifyOtp = ({ email, onVerified, onBack }: VerifyOtpProps) => {
 
   return (
     <div className="auth-box">
-      <h2 className="auth-heading">Verify Your Email</h2>
+      <h2 className="auth-heading">Reset Your Password</h2>
       <p style={{ textAlign: 'center', marginBottom: '1rem', color: '#666' }}>
-        A verification code has been sent to <strong>{email}</strong>
+        A reset code has been sent to <strong>{email}</strong>
       </p>
       <p style={{ textAlign: 'center', marginBottom: '1rem', color: '#999', fontSize: '0.9rem', fontStyle: 'italic' }}>
-        Check your email for the verification code
+        Check your email for the reset code
       </p>
 
       <form className="auth-form" onSubmit={handleSubmit}>
-        <label className="question-label">Verification Code</label>
+        <label className="question-label">Enter 6-digit reset code</label>
         <input
           className="auth-input"
           type="text"
-          placeholder="Enter 6-digit code"
+          placeholder=""
           value={code}
           onChange={(e) => setCode(e.target.value)}
           required
           maxLength={6}
+          disabled={loading}
+          style={{
+            letterSpacing: '0.5em',
+            textAlign: 'center',
+            fontSize: '1.2rem',
+            fontWeight: 'bold'
+          }}
         />
 
         {error && (
@@ -80,8 +93,8 @@ const VerifyOtp = ({ email, onVerified, onBack }: VerifyOtpProps) => {
 
       {onBack && (
         <p className="auth-switch">
-          <button type="button" className="auth-link" onClick={onBack}>
-            Back to Login
+          <button type="button" className="auth-link" onClick={onBack} disabled={loading}>
+            Back to login
           </button>
         </p>
       )}
@@ -89,4 +102,4 @@ const VerifyOtp = ({ email, onVerified, onBack }: VerifyOtpProps) => {
   );
 };
 
-export default VerifyOtp;
+export default ForgotPassword;

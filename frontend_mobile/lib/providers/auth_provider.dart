@@ -62,7 +62,27 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Login existing user
+  /// Login existing user with password (verifies password and sends OTP)
+  Future<bool> loginWithPassword(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiService.loginWithPassword(email, password);
+      _userEmail = email;
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Login existing user (legacy OTP method)
   Future<bool> login(String email) async {
     _isLoading = true;
     _errorMessage = null;

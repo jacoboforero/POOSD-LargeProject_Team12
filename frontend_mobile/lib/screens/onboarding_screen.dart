@@ -5,7 +5,7 @@ import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
 
 /// Onboarding Screen - Personalize Your Daily Briefing
-/// Collects user preferences: topics, interests, job industry, demographic
+/// Collects user preferences matching the webapp exactly
 class OnboardingScreen extends StatefulWidget {
   final String email;
 
@@ -20,20 +20,32 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _topicsController = TextEditingController();
-  final _interestsController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _lifeStageController = TextEditingController();
   final _jobIndustryController = TextEditingController();
-  final _demographicController = TextEditingController();
+  final _attentionGrabbersController = TextEditingController();
+  final _generalInterestsController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
+  String _newsStyle = '';
+  String _newsScope = '';
   bool _isLoading = false;
   String? _errorMessage;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
-    _topicsController.dispose();
-    _interestsController.dispose();
+    _nameController.dispose();
+    _locationController.dispose();
+    _lifeStageController.dispose();
     _jobIndustryController.dispose();
-    _demographicController.dispose();
+    _attentionGrabbersController.dispose();
+    _generalInterestsController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -47,37 +59,52 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
     try {
       final apiService = ApiService();
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-      // Register user with preferences
+      // Register user with all preferences and password
       await apiService.register(
         widget.email,
-        topics: _topicsController.text.trim(),
-        interests: _interestsController.text.trim(),
+        name: _nameController.text.trim(),
+        location: _locationController.text.trim(),
+        lifeStage: _lifeStageController.text.trim(),
         jobIndustry: _jobIndustryController.text.trim(),
-        demographic: _demographicController.text.trim(),
+        topics: _attentionGrabbersController.text.trim(),
+        interests: _generalInterestsController.text.trim(),
+        newsStyle: _newsStyle.isNotEmpty ? _newsStyle : null,
+        newsScope: _newsScope.isNotEmpty ? _newsScope : null,
+        password: _passwordController.text.trim(),
       );
 
       if (mounted) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Sending OTP...'),
+            content: Text('Registration successful! Verifying with password...'),
             backgroundColor: AppTheme.darkGray,
             duration: Duration(seconds: 2),
           ),
         );
 
-        // Automatically trigger login to send OTP
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        final loginSuccess = await authProvider.login(widget.email);
+        // Automatically verify password to trigger OTP
+        final passwordSuccess = await authProvider.loginWithPassword(
+          widget.email,
+          _passwordController.text.trim(),
+        );
 
-        if (loginSuccess && mounted) {
-          // Pop back to auth screen and signal that OTP was sent
+        if (passwordSuccess && mounted) {
+          // Password verified, OTP sent via email - return to auth screen to enter OTP
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Verification code sent to your email! Check your inbox.'),
+              backgroundColor: AppTheme.darkGray,
+              duration: Duration(seconds: 3),
+            ),
+          );
           Navigator.of(context).pop({'otpSent': true, 'email': widget.email});
         } else if (mounted && authProvider.errorMessage != null) {
-          // If login fails after registration, show error
+          // If password verification fails after registration, show error
           setState(() {
-            _errorMessage = 'Registration succeeded but failed to send OTP: ${authProvider.errorMessage}';
+            _errorMessage = 'Registration succeeded but failed to send verification code: ${authProvider.errorMessage}';
             _isLoading = false;
           });
         }
@@ -124,99 +151,277 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // Title
                 Center(
                   child: Text(
-                    '🗞️ Personalize Your Daily Briefing',
+                    'Join IntelliBrief',
                     style: Theme.of(context).textTheme.displayMedium,
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacingSmall),
+                const SizedBox(height: AppTheme.spacingLarge),
 
-                // Subtitle
+                // Name field
+                Text(
+                  'Name',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTheme.spacingSmall),
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    hintText: 'Your full name',
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter your name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppTheme.spacingLarge),
+
+                // About You Section
                 Center(
                   child: Text(
-                    'Let\'s learn a bit about your news style',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontStyle: FontStyle.italic,
+                    'About You',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
                     textAlign: TextAlign.center,
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacingLarge),
+                const SizedBox(height: AppTheme.spacingMedium),
 
-                // Question 1: Topics
+                // Location
                 Text(
-                  '📰 What topics make headlines in your world?',
+                  'Where are you tuning in from? (City, state, or country)',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: AppTheme.spacingSmall),
                 TextFormField(
-                  controller: _topicsController,
+                  controller: _locationController,
                   decoration: const InputDecoration(
-                    hintText: 'e.g., Technology, Politics, Sports',
+                    hintText: 'e.g., New York, NY or United States',
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your topics of interest';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: AppTheme.spacingLarge),
+                const SizedBox(height: AppTheme.spacingMedium),
 
-                // Question 2: Interests
+                // Life Stage
                 Text(
-                  '💡 What subjects always catch your curiosity?',
+                  'What best describes your current stage in life?',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: AppTheme.spacingSmall),
                 TextFormField(
-                  controller: _interestsController,
+                  controller: _lifeStageController,
                   decoration: const InputDecoration(
-                    hintText: 'e.g., AI, Climate Change, Startups',
+                    hintText: 'e.g., student, young professional, parent, retiree',
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your interests';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: AppTheme.spacingLarge),
+                const SizedBox(height: AppTheme.spacingMedium),
 
-                // Question 3: Job Industry
+                // Job Industry
                 Text(
-                  '💼 What industry are you part of (or dreaming of joining)?',
+                  'What field or industry are you part of?',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: AppTheme.spacingSmall),
                 TextFormField(
                   controller: _jobIndustryController,
                   decoration: const InputDecoration(
-                    hintText: 'e.g., Software Engineering, Healthcare',
+                    hintText: 'e.g., healthcare, tech, education',
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter your industry';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: AppTheme.spacingLarge),
 
-                // Question 4: Demographic
+                // News Preferences Section
+                Center(
+                  child: Text(
+                    'News Preferences',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingXSmall),
+                Center(
+                  child: Text(
+                    '(Helps the briefing decide which topics and styles to prioritize.)',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // Attention Grabbers
                 Text(
-                  '👤 How would you describe yourself as a reader?',
+                  'What kinds of stories always grab your attention?',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: AppTheme.spacingSmall),
                 TextFormField(
-                  controller: _demographicController,
+                  controller: _attentionGrabbersController,
                   decoration: const InputDecoration(
-                    hintText: 'e.g., Professional, Student, Enthusiast',
+                    hintText: 'e.g., world news, tech, culture, politics, science (comma-separated)',
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // General Interests
+                Text(
+                  'What are your general interests or passions?',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTheme.spacingSmall),
+                TextFormField(
+                  controller: _generalInterestsController,
+                  decoration: const InputDecoration(
+                    hintText: 'e.g., technology, art, science, sports, travel, cooking (comma-separated)',
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // News Style
+                Text(
+                  'How do you like your news served?',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTheme.spacingSmall),
+                DropdownButtonFormField<String>(
+                  value: _newsStyle.isEmpty ? null : _newsStyle,
+                  decoration: const InputDecoration(
+                    hintText: 'Select an option',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'Quick summaries', child: Text('Quick summaries')),
+                    DropdownMenuItem(value: 'Thoughtful analysis', child: Text('Thoughtful analysis')),
+                    DropdownMenuItem(value: 'Opinion pieces', child: Text('Opinion pieces')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _newsStyle = value ?? '';
+                    });
+                  },
+                ),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // News Scope
+                Text(
+                  'Do you prefer global perspectives, local updates, or both?',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTheme.spacingSmall),
+                DropdownButtonFormField<String>(
+                  value: _newsScope.isEmpty ? null : _newsScope,
+                  decoration: const InputDecoration(
+                    hintText: 'Select an option',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'global', child: Text('Global perspectives')),
+                    DropdownMenuItem(value: 'local', child: Text('Local updates')),
+                    DropdownMenuItem(value: 'both', child: Text('Both')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _newsScope = value ?? '';
+                    });
+                  },
+                ),
+                const SizedBox(height: AppTheme.spacingXLarge),
+
+                // Divider
+                const Divider(),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // Password section
+                Center(
+                  child: Text(
+                    'Secure Your Account',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingXSmall),
+                Center(
+                  child: Text(
+                    'Create a password to protect your account',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          fontStyle: FontStyle.italic,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // Password field
+                Text(
+                  'Password',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTheme.spacingSmall),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    hintText: 'At least 6 characters',
+                    prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.mutedTan),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: AppTheme.mutedTan,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Please describe yourself';
+                      return 'Please enter a password';
+                    }
+                    if (value.length < 6) {
+                      return 'Password must be at least 6 characters';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: AppTheme.spacingMedium),
+
+                // Confirm password field
+                Text(
+                  'Confirm Password',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppTheme.spacingSmall),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirmPassword,
+                  decoration: InputDecoration(
+                    hintText: 'Re-enter your password',
+                    prefixIcon: const Icon(Icons.lock_outline, color: AppTheme.mutedTan),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: AppTheme.mutedTan,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                        });
+                      },
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please confirm your password';
+                    }
+                    if (value != _passwordController.text) {
+                      return 'Passwords do not match';
                     }
                     return null;
                   },
@@ -259,7 +464,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ),
                               ),
                             )
-                          : const Text('Complete Setup'),
+                          : const Text(
+                              'Complete Setup',
+                              style: TextStyle(fontSize: 16),
+                            ),
                     ),
                   ),
                 ),

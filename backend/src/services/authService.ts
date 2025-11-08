@@ -1,8 +1,14 @@
 import bcrypt from "bcrypt";
 import { UserModel } from "../models/User.model";
 import { generateToken } from "../utils/jwt";
+import { EmailService } from "./emailService";
 
 export class AuthService {
+  private emailService: EmailService;
+
+  constructor() {
+    this.emailService = new EmailService();
+  }
   /**
    * Register a new user account
    * Throws error if user already exists
@@ -21,7 +27,8 @@ export class AuthService {
       preferredHeadlines?: string[];
       scrollPastTopics?: string[];
     },
-    name?: string
+    name?: string,
+    password?: string
   ): Promise<void> {
     const normalizedEmail = email.toLowerCase().trim();
 
@@ -29,6 +36,12 @@ export class AuthService {
     const existingUser = await UserModel.findOne({ email: normalizedEmail });
     if (existingUser) {
       throw new Error("User already exists. Please use login instead.");
+    }
+
+    // Hash password if provided
+    let passwordHash: string | undefined;
+    if (password) {
+      passwordHash = await bcrypt.hash(password, 10);
     }
 
     // Generate OTP
@@ -40,6 +53,7 @@ export class AuthService {
     const user = await UserModel.create({
       name: name?.trim(),
       email: normalizedEmail,
+      passwordHash,
       emailVerified: false,
       preferences: {
         topics: preferences?.topics || [],
@@ -70,12 +84,15 @@ export class AuthService {
       },
     });
 
+    // Send registration OTP email
+    await this.emailService.sendRegistrationOTP(normalizedEmail, code, name);
+
     console.log(`\n🆕 NEW USER REGISTRATION`);
     if (name) {
       console.log(`👤 Name: ${name}`);
     }
     console.log(`📧 Email: ${normalizedEmail}`);
-    console.log(`🔑 OTP Code: ${code}`);
+    console.log(`✉️  OTP sent via email`);
     console.log(`📋 Preferences:`);
     console.log(`   Topics: ${user.preferences.topics.join(", ") || "None"}`);
     console.log(`   Interests: ${user.preferences.interests.join(", ") || "None"}`);
@@ -108,7 +125,67 @@ export class AuthService {
   }
 
   /**
-   * Login existing user
+   * Check if user exists (for UI to decide whether to show password field)
+   * Returns true if user exists, false otherwise
+   */
+  async checkUserExists(email: string): Promise<boolean> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await UserModel.findOne({ email: normalizedEmail });
+    return !!user;
+  }
+
+  /**
+   * Login existing user with password
+   * Verifies password and sends OTP for additional security
+   * Throws error if user doesn't exist or password is incorrect
+   */
+  async loginWithPassword(email: string, password: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user exists
+    const user = await UserModel.findOne({ email: normalizedEmail });
+    if (!user) {
+      throw new Error("User not found. Please register first.");
+    }
+
+    // Check if user has a password
+    if (!user.passwordHash) {
+      throw new Error("No password set for this account.");
+    }
+
+    // Verify password
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      throw new Error("Invalid password.");
+    }
+
+    // Password verified - now generate and send OTP
+    const code = this.generateOtpCode();
+    const hashedCode = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Update user with OTP
+    user.otp = {
+      hash: hashedCode,
+      expiresAt,
+      attempts: 0,
+      lastRequestedAt: new Date(),
+    };
+    await user.save();
+
+    // Send login OTP email
+    await this.emailService.sendLoginOTP(normalizedEmail, code);
+
+    console.log(`\n🔐 USER LOGIN WITH PASSWORD`);
+    console.log(`📧 Email: ${normalizedEmail}`);
+    console.log(`✅ Password verified`);
+    console.log(`✉️  OTP sent via email`);
+    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+    console.log(`---\n`);
+  }
+
+  /**
+   * Login existing user (legacy OTP method)
    * Throws error if user doesn't exist
    */
   async login(email: string): Promise<void> {
@@ -134,9 +211,12 @@ export class AuthService {
     };
     await user.save();
 
+    // Send login OTP email
+    await this.emailService.sendLoginOTP(normalizedEmail, code);
+
     console.log(`\n🔐 USER LOGIN`);
     console.log(`📧 Email: ${normalizedEmail}`);
-    console.log(`🔑 OTP Code: ${code}`);
+    console.log(`✉️  OTP sent via email`);
     console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
     console.log(`---\n`);
   }
@@ -210,6 +290,110 @@ export class AuthService {
         updatedAt: user.updatedAt,
       },
     };
+  }
+
+  /**
+   * Request password reset
+   * Sends OTP to user's email for password reset verification
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Check if user exists
+    const user = await UserModel.findOne({ email: normalizedEmail });
+    if (!user) {
+      throw new Error("User not found. Please register first.");
+    }
+
+    // Check if user has a password
+    if (!user.passwordHash) {
+      throw new Error("No password set for this account. Please contact support.");
+    }
+
+    // Generate OTP for password reset
+    const code = this.generateOtpCode();
+    const hashedCode = await bcrypt.hash(code, 10);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Update user with password reset OTP
+    user.otp = {
+      hash: hashedCode,
+      expiresAt,
+      attempts: 0,
+      lastRequestedAt: new Date(),
+    };
+    await user.save();
+
+    // Send password reset OTP email
+    await this.emailService.sendPasswordResetOTP(normalizedEmail, code);
+
+    console.log(`\n🔐 PASSWORD RESET REQUEST`);
+    console.log(`📧 Email: ${normalizedEmail}`);
+    console.log(`✉️  Reset code sent via email`);
+    console.log(`⏰ Expires at: ${expiresAt.toISOString()}`);
+    console.log(`---\n`);
+  }
+
+  /**
+   * Verify password reset code
+   * Validates the OTP code for password reset
+   */
+  async verifyPasswordResetCode(email: string, code: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await UserModel.findOne({ email: normalizedEmail });
+
+    if (!user || !user.otp) {
+      throw new Error("No password reset request found for this email");
+    }
+
+    if (new Date() > user.otp.expiresAt) {
+      throw new Error("Reset code has expired");
+    }
+
+    if (user.otp.attempts >= 5) {
+      throw new Error("Too many failed attempts");
+    }
+
+    const isValid = await bcrypt.compare(code, user.otp.hash);
+
+    if (!isValid) {
+      user.otp.attempts += 1;
+      await user.save();
+      throw new Error("Invalid reset code");
+    }
+
+    // Don't clear OTP yet - we need it for the actual password reset
+    console.log(`\n✅ PASSWORD RESET CODE VERIFIED`);
+    console.log(`📧 Email: ${normalizedEmail}`);
+    console.log(`---\n`);
+  }
+
+  /**
+   * Reset password
+   * Updates user's password after verifying the reset code
+   */
+  async resetPassword(email: string, code: string, newPassword: string): Promise<void> {
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Verify the code again for security
+    await this.verifyPasswordResetCode(normalizedEmail, code);
+
+    const user = await UserModel.findOne({ email: normalizedEmail });
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+
+    // Update password and clear OTP
+    user.passwordHash = passwordHash;
+    user.otp = undefined;
+    await user.save();
+
+    console.log(`\n🔒 PASSWORD RESET SUCCESSFUL`);
+    console.log(`📧 Email: ${normalizedEmail}`);
+    console.log(`---\n`);
   }
 
   private getNextResetTime(): Date {

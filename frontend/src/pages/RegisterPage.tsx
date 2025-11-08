@@ -16,10 +16,11 @@ import Register from '../components/Register';
 interface Props {
   onNavigateToLogin?: () => void;
   onRegister?: (email: string) => void;
+  initialEmail?: string;
 }
 
-const RegisterPage = ({ onNavigateToLogin, onRegister }: Props) => {
-  return <Register onNavigateToLogin={onNavigateToLogin} onRegister={onRegister} />;
+const RegisterPage = ({ onNavigateToLogin, onRegister, initialEmail }: Props) => {
+  return <Register onNavigateToLogin={onNavigateToLogin} onRegister={onRegister} initialEmail={initialEmail} />;
 };
 
 export default RegisterPage;

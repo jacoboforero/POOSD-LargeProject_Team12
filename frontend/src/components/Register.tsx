@@ -4,11 +4,12 @@ import { registerUser } from "../services/authApi";
 interface RegisterProps {
   onNavigateToLogin?: () => void;
   onRegister?: (email: string) => void;
+  initialEmail?: string;
 }
 
-const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
+const Register = ({ onNavigateToLogin, onRegister, initialEmail = "" }: RegisterProps) => {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [location, setLocation] = useState("");
   const [lifeStage, setLifeStage] = useState("");
   const [jobIndustry, setJobIndustry] = useState("");
@@ -16,6 +17,10 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
   const [generalInterests, setGeneralInterests] = useState("");
   const [newsStyle, setNewsStyle] = useState("");
   const [newsScope, setNewsScope] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -41,15 +46,31 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
       return;
     }
 
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
+
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+
     try {
       setLoading(true);
-      
+
       const topicsArray = parseArrayField(attentionGrabbers);
       const interestsArray = parseArrayField(generalInterests);
 
       const response = await registerUser({
         name: name.trim(),
         email,
+        password: password,
         topics: topicsArray,
         interests: interestsArray,
         jobIndustry: jobIndustry.trim() || undefined,
@@ -63,9 +84,12 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
       if (onRegister) onRegister(email);
     } catch (error: any) {
       console.error("Registration failed:", error.response?.data || error.message);
-      const errorMessage = error.response?.data?.message || error.message || "Registration failed. Please try again.";
+      const errorMessage = error.response?.data?.error?.details ||
+                          error.response?.data?.error?.message ||
+                          error.response?.data?.message ||
+                          error.message ||
+                          "Registration failed. Please try again.";
       setError(errorMessage);
-      alert(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -185,6 +209,71 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
           </select>
         </div>
 
+        <div className="personalization-section">
+          <h3 className="section-title">Secure Your Account</h3>
+          <p className="section-subtitle">
+            Create a password to protect your account
+          </p>
+
+          <label className="question-label">Password</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              className="auth-input"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="At least 6 characters"
+              style={{ paddingRight: '40px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '18px',
+              }}
+            >
+              {showPassword ? '👁️' : '👁️‍🗨️'}
+            </button>
+          </div>
+
+          <label className="question-label">Confirm Password</label>
+          <div style={{ position: 'relative' }}>
+            <input
+              className="auth-input"
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              placeholder="Re-enter your password"
+              style={{ paddingRight: '40px' }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '18px',
+              }}
+            >
+              {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+            </button>
+          </div>
+        </div>
+
         {error && (
           <div className="error-message" style={{ color: "red", marginBottom: "10px" }}>
             {error}
@@ -192,7 +281,7 @@ const Register = ({ onNavigateToLogin, onRegister }: RegisterProps) => {
         )}
 
         <button className="auth-button" type="submit" disabled={loading}>
-          {loading ? "Creating account..." : "Sign Up"}
+          {loading ? "Creating account..." : "Complete Setup"}
         </button>
       </form>
 

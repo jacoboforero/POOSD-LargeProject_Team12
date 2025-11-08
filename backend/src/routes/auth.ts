@@ -12,12 +12,27 @@ import { ipRateLimit } from "../middleware/rateLimiter";
 const router = Router();
 const authService = new AuthService();
 
+// POST /api/auth/check-user
+router.post("/check-user", ipRateLimit, async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const exists = await authService.checkUserExists(email);
+    res.json({
+      exists,
+      message: exists ? "User exists" : "New user"
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/auth/register
 router.post("/register", ipRateLimit, async (req, res, next) => {
   try {
     const {
       name,
       email,
+      password,
       topics = [],
       interests = [],
       jobIndustry,
@@ -41,8 +56,8 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
       newsScope,
       preferredHeadlines: Array.isArray(preferredHeadlines) ? preferredHeadlines : [],
       scrollPastTopics: Array.isArray(scrollPastTopics) ? scrollPastTopics : [],
-    }, name);
-    
+    }, name, password);
+
     res.status(201).json({
       success: true,
       message:
@@ -53,7 +68,21 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
   }
 });
 
-// POST /api/auth/login
+// POST /api/auth/login-password
+router.post("/login-password", ipRateLimit, async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    await authService.loginWithPassword(email, password);
+    res.json({
+      success: true,
+      message: "Password verified! Please check your console for OTP code.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/login (legacy OTP method)
 router.post("/login", ipRateLimit, async (req, res, next) => {
   try {
     const { email } = req.body;
@@ -73,6 +102,48 @@ router.post("/verify", ipRateLimit, async (req, res, next) => {
     const { email, code } = req.body;
     const session = await authService.verifyOtp(email, code);
     res.json(session);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/forgot-password
+router.post("/forgot-password", ipRateLimit, async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    await authService.requestPasswordReset(email);
+    res.json({
+      success: true,
+      message: "Password reset code sent! Please check your console for OTP code.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/verify-reset-code
+router.post("/verify-reset-code", ipRateLimit, async (req, res, next) => {
+  try {
+    const { email, code } = req.body;
+    await authService.verifyPasswordResetCode(email, code);
+    res.json({
+      success: true,
+      message: "Code verified. You can now reset your password.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/auth/reset-password
+router.post("/reset-password", ipRateLimit, async (req, res, next) => {
+  try {
+    const { email, code, newPassword } = req.body;
+    await authService.resetPassword(email, code, newPassword);
+    res.json({
+      success: true,
+      message: "Password reset successful. You can now log in with your new password.",
+    });
   } catch (error) {
     next(error);
   }

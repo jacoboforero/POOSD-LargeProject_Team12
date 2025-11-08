@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IUser extends Document {
   name?: string;
   email: string;
+  passwordHash?: string;
   emailVerified: boolean;
   otp?: {
     hash: string;
@@ -49,6 +50,7 @@ export interface IUser extends Document {
 const UserSchema = new Schema<IUser>({
   name: { type: String },
   email: { type: String, required: true, lowercase: true },
+  passwordHash: { type: String },
   emailVerified: { type: Boolean, default: false },
 
   otp: {
