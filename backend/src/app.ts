@@ -22,8 +22,11 @@ dotenv.config();
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
+// Security middleware - relax CSP for frontend assets
+app.use(helmet({
+  contentSecurityPolicy: false,  // Disable CSP for frontend to work
+  crossOriginEmbedderPolicy: false,
+}));
 app.use(
   cors({
     origin: process.env.NODE_ENV === "production" 
