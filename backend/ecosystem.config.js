@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "news-briefing-api",
-      script: "./dist/index.js",
+      script: "./dist/backend/src/index.js",
       cwd: "/root/POOSD/POOSD-LargeProject_Team12/backend",
       env: {
         NODE_ENV: "production",
