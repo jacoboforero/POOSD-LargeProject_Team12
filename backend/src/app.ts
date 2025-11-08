@@ -64,7 +64,7 @@ app.use("/api/me", userRoutes);
 app.use("/api/briefings", briefingRoutes);
 
 // Serve built frontend if available so the IP serves the web app directly
-const frontendDistPath = path.resolve(__dirname, "../../../frontend/dist");
+const frontendDistPath = path.resolve(__dirname, "../../../../frontend/dist");
 if (fs.existsSync(frontendDistPath)) {
   app.use(express.static(frontendDistPath));
 
