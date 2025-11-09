@@ -1,18 +1,46 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'storage_service.dart';
 
 /// API Service for IntelliBrief Backend
 /// Handles all HTTP requests to the backend server
 class ApiService {
-  // Base URL - change this to your backend URL
-  // LOCAL DEVELOPMENT - Using localhost (change port to 3002 if needed)
-  static const String baseUrl = 'http://localhost:3001';
+  // Custom base URL can be provided at build time:
+  // flutter run --dart-define API_BASE_URL=https://poosdproj.xyz
+  static const String _envBaseUrl =
+      String.fromEnvironment('API_BASE_URL', defaultValue: '');
 
-  // ALTERNATIVE CONFIGURATIONS:
-  // For iOS simulator local development: http://localhost:3002
-  // For Android emulator local development: http://10.0.2.2:3002
-  // For production (remote server): http://129.212.183.227:3001
+  static const String _prodBaseUrl = 'https://poosdproj.xyz';
+  static const String _iosSimulatorBaseUrl = 'http://127.0.0.1:3001';
+  static const String _androidEmulatorBaseUrl = 'http://10.0.2.2:3001';
+  static const String _defaultLocalBaseUrl = 'http://localhost:3001';
+
+  static String get baseUrl {
+    if (_envBaseUrl.isNotEmpty) {
+      return _envBaseUrl;
+    }
+
+    if (kReleaseMode) {
+      return _prodBaseUrl;
+    }
+
+    if (!kIsWeb) {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.android:
+          return _androidEmulatorBaseUrl;
+        case TargetPlatform.iOS:
+          // Physical iPhones cannot reach localhost, so default to prod.
+          // Use --dart-define API_BASE_URL=http://127.0.0.1:3001 when
+          // testing on the simulator against a local backend.
+          return _prodBaseUrl;
+        default:
+          break;
+      }
+    }
+
+    return _defaultLocalBaseUrl;
+  }
 
   final StorageService _storage = StorageService();
 
