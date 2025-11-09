@@ -1,5 +1,37 @@
 import axios from 'axios';
 
+const extractErrorMessage = (error: unknown, fallback: string) => {
+  if (axios.isAxiosError(error)) {
+    const details = error.response?.data?.error?.details;
+
+    if (typeof details === 'string' && details.trim()) {
+      return details;
+    }
+
+    if (details && typeof details === 'object') {
+      const detailObj = details as Record<string, unknown>;
+      for (const key of ['info', 'message', 'detail', 'error']) {
+        const value = detailObj[key];
+        if (typeof value === 'string' && value.trim()) {
+          return value;
+        }
+      }
+    }
+
+    const messageFromResponse =
+      error.response?.data?.error?.message || error.response?.data?.message;
+    if (typeof messageFromResponse === 'string' && messageFromResponse.trim()) {
+      return messageFromResponse;
+    }
+  }
+
+  if (error instanceof Error && typeof error.message === 'string' && error.message.trim()) {
+    return error.message;
+  }
+
+  return fallback;
+};
+
 export interface RegisterRequest {
   name: string;
   email: string;
@@ -61,11 +93,16 @@ export const checkUserExists = async (email: string): Promise<boolean> => {
  * Login with email and password (sends OTP after verification)
  */
 export const loginWithPassword = async (email: string, password: string): Promise<RegisterResponse> => {
-  const response = await axios.post<RegisterResponse>('/api/auth/login-password', {
-    email: email.toLowerCase().trim(),
-    password: password,
-  });
-  return response.data;
+  try {
+    const response = await axios.post<RegisterResponse>('/api/auth/login-password', {
+      email: email.toLowerCase().trim(),
+      password: password,
+    });
+    return response.data;
+  } catch (error) {
+    const message = extractErrorMessage(error, 'Login failed. Please try again.');
+    throw new Error(message);
+  }
 };
 
 /**
@@ -144,4 +181,3 @@ export const resetPassword = async (email: string, code: string, newPassword: st
   });
   return response.data;
 };
-

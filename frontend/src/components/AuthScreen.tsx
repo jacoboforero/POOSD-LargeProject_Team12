@@ -70,13 +70,15 @@ const AuthScreen = ({ onNavigateToRegister, onShowOtp, onForgotPassword, success
         onShowOtp(email);
       }
     } catch (error: any) {
-      console.error('Login failed:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.error?.details ||
-                          error.response?.data?.error?.message ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          'Login failed. Please try again.';
-      setError(errorMessage);
+      console.error('Login failed:', error?.response?.data || error?.message || error);
+      const rawMessage = error?.response?.data?.error?.details ||
+                         error?.response?.data?.error?.message ||
+                         error?.response?.data?.message ||
+                         error?.message;
+      const normalizedMessage = typeof rawMessage === 'string' && rawMessage.trim()
+        ? rawMessage
+        : 'Login failed. Please try again.';
+      setError(normalizedMessage);
     } finally {
       setLoading(false);
     }
