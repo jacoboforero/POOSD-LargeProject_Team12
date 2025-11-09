@@ -36,16 +36,16 @@ export interface RegisterRequest {
   name: string;
   email: string;
   password?: string;
-  topics?: string[];
-  interests?: string[];
+  topics?: string | string[];
+  interests?: string | string[];
   jobIndustry?: string;
   demographic?: string;
   location?: string;
   lifeStage?: string;
   newsStyle?: string;
   newsScope?: string;
-  preferredHeadlines?: string[];
-  scrollPastTopics?: string[];
+  preferredHeadlines?: string | string[];
+  scrollPastTopics?: string | string[];
 }
 
 export interface RegisterResponse {
