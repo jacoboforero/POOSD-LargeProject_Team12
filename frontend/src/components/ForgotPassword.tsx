@@ -35,13 +35,12 @@ const ForgotPassword = ({ email, onCodeVerified, onBack }: ForgotPasswordProps) 
         onCodeVerified(code);
       }
     } catch (error: any) {
-      console.error('Verification failed:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.error?.details ||
-                          error.response?.data?.error?.message ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          'Verification failed. Please try again.';
-      setError(errorMessage);
+      console.error('Verification failed:', error?.response?.data || error?.message || error);
+      const normalizedMessage =
+        typeof error?.message === 'string' && error.message.trim()
+          ? error.message
+          : 'Verification failed. Please try again.';
+      setError(normalizedMessage);
     } finally {
       setLoading(false);
     }

@@ -163,21 +163,31 @@ export const requestPasswordReset = async (email: string): Promise<RegisterRespo
  * Verify password reset code
  */
 export const verifyResetCode = async (email: string, code: string): Promise<RegisterResponse> => {
-  const response = await axios.post<RegisterResponse>('/api/auth/verify-reset-code', {
-    email: email.toLowerCase().trim(),
-    code: code,
-  });
-  return response.data;
+  try {
+    const response = await axios.post<RegisterResponse>('/api/auth/verify-reset-code', {
+      email: email.toLowerCase().trim(),
+      code: code,
+    });
+    return response.data;
+  } catch (error) {
+    const message = extractErrorMessage(error, 'Verification failed. Please try again.');
+    throw new Error(message);
+  }
 };
 
 /**
  * Reset password with verified code
  */
 export const resetPassword = async (email: string, code: string, newPassword: string): Promise<RegisterResponse> => {
-  const response = await axios.post<RegisterResponse>('/api/auth/reset-password', {
-    email: email.toLowerCase().trim(),
-    code: code,
-    newPassword: newPassword,
-  });
-  return response.data;
+  try {
+    const response = await axios.post<RegisterResponse>('/api/auth/reset-password', {
+      email: email.toLowerCase().trim(),
+      code: code,
+      newPassword: newPassword,
+    });
+    return response.data;
+  } catch (error) {
+    const message = extractErrorMessage(error, 'Password reset failed. Please try again.');
+    throw new Error(message);
+  }
 };

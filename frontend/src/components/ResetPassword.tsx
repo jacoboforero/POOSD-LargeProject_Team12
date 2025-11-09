@@ -44,13 +44,12 @@ const ResetPassword = ({ email, code, onPasswordReset, onBack }: ResetPasswordPr
         onPasswordReset();
       }
     } catch (error: any) {
-      console.error('Password reset failed:', error.response?.data || error.message);
-      const errorMessage = error.response?.data?.error?.details ||
-                          error.response?.data?.error?.message ||
-                          error.response?.data?.message ||
-                          error.message ||
-                          'Password reset failed. Please try again.';
-      setError(errorMessage);
+      console.error('Password reset failed:', error?.response?.data || error?.message || error);
+      const normalizedMessage =
+        typeof error?.message === 'string' && error.message.trim()
+          ? error.message
+          : 'Password reset failed. Please try again.';
+      setError(normalizedMessage);
     } finally {
       setLoading(false);
     }
