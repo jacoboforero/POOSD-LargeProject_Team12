@@ -20,7 +20,12 @@ jobs:
           cache: "npm"
           cache-dependency-path: "backend/package-lock.json"
 
-      - name: Install dependencies and build
+      - name: Install contracts dependencies
+        run: |
+          cd packages/contracts
+          npm ci
+
+      - name: Install backend dependencies and build
         run: |
           cd backend
           npm ci
