@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../services/api_service.dart';
@@ -21,6 +22,7 @@ class _LandingPageState extends State<LandingPage> {
   bool _isGenerating = false;
   String? _briefingId;
   String? _briefingContent;
+  List<Map<String, dynamic>> _citations = [];
   String? _errorMessage;
   String _status = 'idle'; // idle, queued, fetching, summarizing, done, error
   Map<String, dynamic>? _lastCustomPayload;
@@ -42,6 +44,7 @@ class _LandingPageState extends State<LandingPage> {
     setState(() {
       _isGenerating = true;
       _briefingContent = null;
+      _citations = [];
       _errorMessage = null;
       _status = 'queued';
       _generationKind = kind;
@@ -86,6 +89,27 @@ class _LandingPageState extends State<LandingPage> {
       () => _apiService.generateCustomNewsQuery(_lastCustomPayload!),
       'custom_news_query',
     );
+  }
+
+  Future<void> _openUrl(String urlString) async {
+    try {
+      final url = Uri.parse(urlString);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open article link')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening link: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _openCustomNewsQuerySheet() async {
@@ -162,6 +186,7 @@ class _LandingPageState extends State<LandingPage> {
       if (response['summary'] != null) {
         final summary = response['summary'];
         final sections = summary['sections'] as List<dynamic>? ?? [];
+        final citations = summary['citations'] as List<dynamic>? ?? [];
 
         // Build briefing content from sections
         final content = StringBuffer();
@@ -176,8 +201,19 @@ class _LandingPageState extends State<LandingPage> {
           }
         }
 
+        // Store citations separately for clickable links
+        final citationsList = citations
+            .where((c) => c['url'] != null)
+            .map((c) => {
+                  'title': c['title'] ?? 'Read Article',
+                  'url': c['url'] as String,
+                  'source': c['source'] ?? 'Source',
+                })
+            .toList();
+
         setState(() {
           _briefingContent = content.toString().trim();
+          _citations = citationsList;
           _isGenerating = false;
           _status = 'done';
         });
@@ -594,6 +630,68 @@ class _LandingPageState extends State<LandingPage> {
               height: 1.6,
             ),
           ),
+          if (_citations.isNotEmpty) ...[
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 16),
+            const Text(
+              '📚 SOURCES',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            ..._citations.asMap().entries.map((entry) {
+              final index = entry.key;
+              final citation = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: GestureDetector(
+                  onTap: () => _openUrl(citation['url'] as String),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${index + 1}. ',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF475467),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              citation['title'] as String,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF2563EB),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(left: 20, top: 2),
+                        child: Text(
+                          citation['source'] as String,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6B7280),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+          ],
         ],
       ),
     );
