@@ -40,7 +40,7 @@ export class EmailService {
     };
 
     const mailOptions = {
-      from: `"IntelliBrief" <${process.env.SMTP_USER}>`,
+      from: `"IntelliBrief" <hello@${process.env.VERIFIED_DOMAIN || 'yourdomain.com'}>`,
       to: email,
       subject: "Welcome to IntelliBrief - Verify Your Email",
       html: `
@@ -92,7 +92,7 @@ IntelliBrief - Your personalized daily briefing
     };
 
     const mailOptions = {
-      from: `"IntelliBrief" <${process.env.SMTP_USER}>`,
+      from: `"IntelliBrief" <hello@${process.env.VERIFIED_DOMAIN || 'yourdomain.com'}>`,
       to: email,
       subject: "IntelliBrief - Login Verification Code",
       html: `
@@ -144,7 +144,7 @@ IntelliBrief - Your personalized daily briefing
     };
 
     const mailOptions = {
-      from: `"IntelliBrief" <${process.env.SMTP_USER}>`,
+      from: `"IntelliBrief" <hello@${process.env.VERIFIED_DOMAIN || 'yourdomain.com'}>`,
       to: email,
       subject: "IntelliBrief - Password Reset Code",
       html: `
