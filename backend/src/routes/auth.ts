@@ -7,7 +7,7 @@ import {
 } from "../../../packages/contracts/src";
 import { AuthService } from "../services/authService";
 import { validateRequest, validateResponse } from "../middleware/validation";
-import { ipRateLimit } from "../middleware/rateLimiter";
+// import { ipRateLimit } from "../middleware/rateLimiter";
 import { RequestContext } from "../types/context";
 import { RequestWithId } from "../types/request";
 
@@ -21,7 +21,7 @@ const getRequestContext = (req: RequestWithId): RequestContext => ({
 });
 
 // POST /api/auth/check-user
-router.post("/check-user", ipRateLimit, async (req, res, next) => {
+router.post("/check-user", async (req, res, next) => {
   try {
     const { email } = req.body;
     const exists = await authService.checkUserExists(email);
@@ -35,7 +35,7 @@ router.post("/check-user", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/register
-router.post("/register", ipRateLimit, async (req, res, next) => {
+router.post("/register", async (req, res, next) => {
   try {
     const {
       name,
@@ -77,7 +77,7 @@ router.post("/register", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/login-password
-router.post("/login-password", ipRateLimit, async (req, res, next) => {
+router.post("/login-password", async (req, res, next) => {
   try {
     const { email, password } = req.body;
     await authService.loginWithPassword(email, password);
@@ -91,7 +91,7 @@ router.post("/login-password", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/login (legacy OTP method)
-router.post("/login", ipRateLimit, async (req, res, next) => {
+router.post("/login", async (req, res, next) => {
   try {
     const { email } = req.body;
     await authService.login(email);
@@ -105,7 +105,7 @@ router.post("/login", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/verify
-router.post("/verify", ipRateLimit, async (req, res, next) => {
+router.post("/verify", async (req, res, next) => {
   try {
     const { email, code } = req.body;
     const session = await authService.verifyOtp(email, code);
@@ -116,7 +116,7 @@ router.post("/verify", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/forgot-password
-router.post("/forgot-password", ipRateLimit, async (req, res, next) => {
+router.post("/forgot-password", async (req, res, next) => {
   try {
     const { email } = req.body;
     await authService.requestPasswordReset(email);
@@ -130,7 +130,7 @@ router.post("/forgot-password", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/verify-reset-code
-router.post("/verify-reset-code", ipRateLimit, async (req, res, next) => {
+router.post("/verify-reset-code", async (req, res, next) => {
   try {
     const { email, code } = req.body;
     await authService.verifyPasswordResetCode(email, code);
@@ -144,7 +144,7 @@ router.post("/verify-reset-code", ipRateLimit, async (req, res, next) => {
 });
 
 // POST /api/auth/reset-password
-router.post("/reset-password", ipRateLimit, async (req, res, next) => {
+router.post("/reset-password", async (req, res, next) => {
   try {
     const { email, code, newPassword } = req.body;
     await authService.resetPassword(email, code, newPassword);
@@ -159,7 +159,7 @@ router.post("/reset-password", ipRateLimit, async (req, res, next) => {
 
 // Legacy endpoint for backwards compatibility
 // POST /api/auth/otp/request
-router.post("/otp/request", ipRateLimit, async (req, res, next) => {
+router.post("/otp/request", async (req, res, next) => {
   try {
     const { email } = req.body;
     await authService.requestOtp(email);
@@ -171,7 +171,7 @@ router.post("/otp/request", ipRateLimit, async (req, res, next) => {
 
 // Legacy endpoint for backwards compatibility
 // POST /api/auth/otp/verify
-router.post("/otp/verify", ipRateLimit, async (req, res, next) => {
+router.post("/otp/verify", async (req, res, next) => {
   try {
     const { email, code } = req.body;
     const session = await authService.verifyOtp(email, code);

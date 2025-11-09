@@ -10,7 +10,7 @@ import { RequestWithId } from "./types/request";
 // Import middleware
 import { requestId } from "./middleware/requestId";
 import { errorHandler } from "./middleware/errorHandler";
-import { ipRateLimit } from "./middleware/rateLimiter";
+// import { ipRateLimit } from "./middleware/rateLimiter";
 
 // Import routes
 import authRoutes from "./routes/auth";
@@ -49,8 +49,8 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// Global rate limiting
-app.use(ipRateLimit);
+// Global rate limiting - DISABLED for demo
+// app.use(ipRateLimit);
 
 // Health check
 app.get("/health", (req, res) => {
