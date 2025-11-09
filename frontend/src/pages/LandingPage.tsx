@@ -409,9 +409,10 @@ const LandingPage = ({ username, onLogout }: LandingPageProps) => {
 
       if (response.data.summary) {
         const sections = response.data.summary.sections || [];
+        const citations = response.data.summary.citations || [];
 
         // Build briefing content from sections
-        const content = sections
+        let content = sections
           .map((section: any) => {
             let text = "";
             if (section.category) {
@@ -423,6 +424,18 @@ const LandingPage = ({ username, onLogout }: LandingPageProps) => {
             return text;
           })
           .join("");
+
+        // Add citations/sources at the end
+        if (citations.length > 0) {
+          content += "\n\n📚 **SOURCES**\n\n";
+          citations.forEach((citation: any, index: number) => {
+            if (citation.url) {
+              const title = citation.title || 'Read Article';
+              const source = citation.source || 'Source';
+              content += `${index + 1}. [${title}](${citation.url}) — *${source}*\n\n`;
+            }
+          });
+        }
 
         setBriefingContent(content.trim());
         setIsGenerating(false);
@@ -673,7 +686,15 @@ const LandingPage = ({ username, onLogout }: LandingPageProps) => {
               </button>
             </header>
             <div className="briefing-body typography-serif">
-              <ReactMarkdown>{briefingContent}</ReactMarkdown>
+              <ReactMarkdown
+                components={{
+                  a: ({ node, ...props }) => (
+                    <a {...props} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'underline' }} />
+                  ),
+                }}
+              >
+                {briefingContent}
+              </ReactMarkdown>
             </div>
           </section>
         )}
