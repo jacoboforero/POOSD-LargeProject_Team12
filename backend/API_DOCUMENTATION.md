@@ -4,8 +4,8 @@ Complete REST API reference for the News Briefing backend.
 
 ## Base URLs
 
-- **Local Development:** `http://localhost:3001`
-- **Production:** `http://129.212.183.227:3001`
+- **Local Development:** `http://localhost:3002` (or whatever `PORT` you set in `.env`)
+- **Production:** `https://poosdproj.xyz` (proxied to `129.212.183.227:3001`)
 
 ## Authentication
 
@@ -33,8 +33,9 @@ Check server status.
 ```json
 {
   "status": "ok",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "environment": "development",
+  "message": "Deployment pipeline test - successful!",
   "timestamp": "2025-10-23T12:00:00.000Z"
 }
 ```
@@ -43,17 +44,49 @@ Check server status.
 
 ### Authentication
 
+#### Check if User Exists (pre-login hint)
+
+**POST** `/api/auth/check-user`
+
+Returns whether the email already has an account. Helpful for deciding when to show the password field in the UI.
+
+**Request:**
+
+```json
+{ "email": "person@example.com" }
+```
+
+**Response:**
+
+```json
+{ "exists": true, "message": "User exists" }
+```
+
+---
+
 #### Register New User
 
 **POST** `/api/auth/register`
 
-Register a new user account. Creates a new user and sends an OTP for verification.
+Creates a new account, stores optional onboarding preferences, and emails a 6-digit OTP code.
 
 **Request:**
 
 ```json
 {
-  "email": "newuser@example.com"
+  "email": "newuser@example.com",
+  "name": "Avery Patel",
+  "password": "StrongPass!9",
+  "topics": ["technology", "markets"],
+  "interests": ["AI", "semiconductors"],
+  "jobIndustry": "tech",
+  "demographic": "young professional",
+  "location": "San Francisco, CA",
+  "lifeStage": "early career",
+  "newsStyle": "thoughtful analysis",
+  "newsScope": "global",
+  "preferredHeadlines": ["deep dives"],
+  "scrollPastTopics": ["celebrity gossip"]
 }
 ```
 
@@ -62,29 +95,27 @@ Register a new user account. Creates a new user and sends an OTP for verificatio
 ```json
 {
   "success": true,
-  "message": "Registration successful. Please check your console for OTP code."
+  "message": "Registration successful. Please check your email for the verification code."
 }
 ```
 
-**Errors:**
+**Notes**
 
-- `400` - User already exists (use `/api/auth/login` instead)
-
-**Note:** OTP is logged to server console. Check server logs for the 6-digit code. OTP expires in 10 minutes.
+- Email delivery is handled through your SMTP configuration. The OTP is logged to the console only if the email fails.
+- OTP codes expire after 10 minutes and allow 5 attempts.
 
 ---
 
-#### Login Existing User
+#### Login (password + OTP)
 
-**POST** `/api/auth/login`
+**POST** `/api/auth/login-password`
 
-Login an existing user. Sends an OTP for authentication.
-
-**Request:**
+Verifies the stored password (if set) and then emails an OTP.
 
 ```json
 {
-  "email": "user@example.com"
+  "email": "user@example.com",
+  "password": "StrongPass!9"
 }
 ```
 
@@ -93,15 +124,23 @@ Login an existing user. Sends an OTP for authentication.
 ```json
 {
   "success": true,
-  "message": "OTP sent. Please check your console for the code."
+  "message": "Password verified! Please check your email for the OTP code."
 }
 ```
 
-**Errors:**
+Use `/api/auth/verify` afterwards with the emailed code to obtain a JWT.
 
-- `400` - User not found (use `/api/auth/register` instead)
+---
 
-**Note:** OTP is logged to server console. Check server logs for the 6-digit code. OTP expires in 10 minutes.
+#### Login (OTP-only legacy flow)
+
+**POST** `/api/auth/login`
+
+Sends an OTP email without requiring a password (legacy flow used by older clients).
+
+```json
+{ "email": "user@example.com" }
+```
 
 ---
 
@@ -109,9 +148,7 @@ Login an existing user. Sends an OTP for authentication.
 
 **POST** `/api/auth/verify`
 
-Verify OTP code and receive JWT authentication token. Works for both registration and login flows.
-
-**Request:**
+Verifies the 6-digit code and returns the session token + user profile.
 
 ```json
 {
@@ -130,24 +167,53 @@ Verify OTP code and receive JWT authentication token. Works for both registratio
     "email": "user@example.com",
     "emailVerified": true,
     "preferences": {
-      "topics": [],
-      "interests": []
+      "topics": ["technology"],
+      "interests": ["AI"]
     },
     "timezone": "UTC",
-    "notificationPrefs": {
-      "onBriefingReady": true
-    },
+    "notificationPrefs": { "onBriefingReady": true },
     "createdAt": "2025-10-23T12:00:00.000Z",
-    "updatedAt": "2025-10-23T12:00:00.000Z"
+    "updatedAt": "2025-10-23T12:10:00.000Z"
   }
 }
 ```
 
-**Errors:**
+Errors: `400` for invalid/expired code, `429` after 5 failed attempts.
 
-- `400` - Invalid OTP code
-- `400` - OTP expired (request new OTP)
-- `400` - Too many failed attempts (request new OTP)
+---
+
+#### Password Reset Flow
+
+1. **Start reset:** `POST /api/auth/forgot-password`
+
+   ```json
+   { "email": "user@example.com" }
+   ```
+
+2. **Verify reset code:** `POST /api/auth/verify-reset-code`
+
+   ```json
+   { "email": "user@example.com", "code": "654321" }
+   ```
+
+3. **Set new password:** `POST /api/auth/reset-password`
+
+   ```json
+   {
+     "email": "user@example.com",
+     "code": "654321",
+     "newPassword": "AnotherStrongPass!1"
+   }
+   ```
+
+All steps send/expect codes via email using the same 10-minute TTL.
+
+---
+
+#### Legacy OTP Convenience Endpoints
+
+- `POST /api/auth/otp/request` – single endpoint that registers or logs in depending on whether the email already exists.
+- `POST /api/auth/otp/verify` – identical to `/api/auth/verify`; maintained for backwards compatibility.
 
 ---
 
@@ -155,7 +221,7 @@ Verify OTP code and receive JWT authentication token. Works for both registratio
 
 #### Get Current User
 
-**GET** `/api/me/me`
+**GET** `/api/me`
 
 Get current user's profile.
 
@@ -306,7 +372,10 @@ Generate the standard personalized briefing using the user's saved preferences. 
 }
 ```
 
-**Note:** Processing happens in background. Poll status endpoint to check completion.
+**Notes**
+
+- Processing happens asynchronously (queue → fetching → summarizing). Poll the status route until `status = "done"`.
+- The server fetches articles via NewsAPI, scrapes up to 3 full-text sources, and runs them through GPT-4o to produce the summary payload.
 
 ---
 
@@ -404,16 +473,16 @@ Get complete briefing with articles and summary.
   "summary": {
     "sections": [
       {
-        "category": "technology",
-        "text": "This is a stub summary. Real news integration coming soon."
+        "category": "overview",
+        "text": "Chipmakers accelerated fab capacity expansions this week while regulators cleared a key AI alliance, signaling continued momentum across semiconductors and enterprise AI adoption."
       }
     ],
     "generatedAt": "2025-10-23T12:00:03.000Z",
     "llm": {
       "provider": "openai",
-      "model": "gpt-4o-mini",
-      "inputTokens": 0,
-      "outputTokens": 0
+      "model": "gpt-4o",
+      "inputTokens": 1850,
+      "outputTokens": 410
     }
   },
   "queuedAt": "2025-10-23T12:00:00.000Z",
@@ -454,17 +523,17 @@ All errors follow this format:
 
 ---
 
-## Rate Limiting
+## Rate Limiting & Quotas
 
-- **Per IP:** 100 requests per 15 minutes
-- **Per User:** 200 requests per 15 minutes
-- **Daily Briefings:** 3 per user (configurable)
+- **Per user:** `userRateLimit` enforces 200 requests per 15 minutes (hard-coded values in `src/middleware/rateLimiter.ts`).
+- **Per IP:** middleware exists but is disabled by default in `app.ts`; enable when you need network-level throttling (defaults to 100 / 15 min).
+- **Briefings:** `tryConsumeDailyGenerate` limits each user to 3 generations per day (set `DAILY_QUOTA_LIMIT`).
 
-Rate limit headers included in responses:
+Responses include standard headers:
 
 ```
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 95
+X-RateLimit-Limit: 200
+X-RateLimit-Remaining: 195
 X-RateLimit-Reset: 1729684800
 ```
 
@@ -476,22 +545,22 @@ X-RateLimit-Reset: 1729684800
 
 ```bash
 # 1. Health check
-curl http://localhost:3001/health
+curl http://localhost:3002/health
 
 # 2. Register new user
-curl -X POST http://localhost:3001/api/auth/register \
+curl -X POST http://localhost:3002/api/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email": "newuser@example.com"}'
 
-# 3. Check server logs for OTP code, then verify
-curl -X POST http://localhost:3001/api/auth/verify \
+# 3. Check your email for the OTP code (logs include a fallback), then verify
+curl -X POST http://localhost:3002/api/auth/verify \
   -H "Content-Type: application/json" \
   -d '{"email": "newuser@example.com", "code": "123456"}'
 
 # Save the token from response
 
 # 4. Get user profile
-curl http://localhost:3001/api/me/me \
+curl http://localhost:3002/api/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
@@ -499,12 +568,12 @@ curl http://localhost:3001/api/me/me \
 
 ```bash
 # 1. Login existing user
-curl -X POST http://localhost:3001/api/auth/login \
+curl -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email": "existinguser@example.com"}'
 
-# 2. Check server logs for OTP, then verify
-curl -X POST http://localhost:3001/api/auth/verify \
+# 2. Check your email for the OTP (server logs include fallback), then verify
+curl -X POST http://localhost:3002/api/auth/verify \
   -H "Content-Type: application/json" \
   -d '{"email": "existinguser@example.com", "code": "123456"}'
 
@@ -515,15 +584,15 @@ curl -X POST http://localhost:3001/api/auth/verify \
 
 ```bash
 # Get user profile
-curl http://localhost:3001/api/me/me \
+curl http://localhost:3002/api/me \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 
 # Check usage
-curl http://localhost:3001/api/me/usage \
+curl http://localhost:3002/api/me/usage \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 
 # Generate briefing
-curl -X POST http://localhost:3001/api/briefings/generate \
+curl -X POST http://localhost:3002/api/briefings/generate \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json" \
   -d '{"topics": ["technology"]}'
@@ -531,11 +600,11 @@ curl -X POST http://localhost:3001/api/briefings/generate \
 # Save briefingId from response
 
 # Check status (poll until status = "done")
-curl http://localhost:3001/api/briefings/BRIEFING_ID/status \
+curl http://localhost:3002/api/briefings/BRIEFING_ID/status \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 
 # Get complete briefing
-curl http://localhost:3001/api/briefings/BRIEFING_ID \
+curl http://localhost:3002/api/briefings/BRIEFING_ID \
   -H "Authorization: Bearer YOUR_TOKEN_HERE"
 ```
 
@@ -543,19 +612,16 @@ curl http://localhost:3001/api/briefings/BRIEFING_ID \
 
 ## Current Limitations
 
-**⚠️ MVP Status - Dummy Data:**
+- Background work runs inside the Express process via `setTimeout`. If the server restarts mid-run the job is lost.
+- `ipRateLimit` middleware is disabled by default; only per-user throttling and daily quotas are enforced.
+- SMTP delivery does not yet include retries/webhooks; failures surface in server logs and fallback OTP logging.
+- Requires valid `NEWS_API_KEY` and `OPENAI_API_KEY` to boot because the Briefing service instantiates both clients at startup.
 
-- Articles and summaries are placeholder data
-- No real news API integration yet
-- No OpenAI integration yet
-- OTPs are logged to console (no email service yet)
+**Coming Soon**
 
-**Coming Soon:**
-
-- Real news article fetching
-- AI-powered summarization
-- Email delivery for OTPs
-- Frontend web application
+- Redis-backed job queue (BullMQ) so briefings survive restarts
+- Richer email templates + provider metrics
+- Push notifications for completed briefings
 
 ---
 

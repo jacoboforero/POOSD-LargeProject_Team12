@@ -2,23 +2,22 @@
 
 Technical architecture overview for the Personalized News Briefing application.
 
-## Current Status: MVP Backend
+## Current Status
 
-**✅ Implemented:**
+**✅ Implemented**
 
-- Express.js REST API with TypeScript
-- MongoDB database with Mongoose ODM
-- OTP-based authentication with JWT
-- User management and preferences
-- Briefing generation pipeline (with stub data)
-- Automated deployment via GitHub Actions
+- Express.js REST API (TypeScript) backed by MongoDB/Mongoose
+- Password + OTP authentication, JWT sessions, SMTP email delivery
+- User preference management, daily quotas, and per-user rate limiting
+- NewsAPI ingestion + article scraping + GPT-4o summarization
+- GitHub Actions deployment that ships pre-built backend + frontend artifacts to DigitalOcean
+- React + Flutter clients sharing the same Zod contracts
 
-**🚧 In Progress:**
+**🚧 In Progress**
 
-- News API integration
-- OpenAI summarization
-- Email service for OTPs
-- Web frontend (Next.js)
+- Durable job queue (BullMQ/Redis) so background jobs survive restarts
+- Production-ready mobile/web UX (push notifications, sharing, richer dashboards)
+- Expanded observability + admin tooling (metrics, alerting)
 
 ---
 
@@ -30,16 +29,16 @@ Technical architecture overview for the Personalized News Briefing application.
 └─────────────────┘
          │
          ↓
-┌─────────────────────────────────────────────────┐
-│  DigitalOcean Server (129.212.183.227:3001)    │
-│  ┌──────────────────────────────────────┐      │
-│  │  Express.js API (PM2)                │      │
-│  │  - Authentication (OTP + JWT)        │      │
-│  │  - User Management                   │      │
-│  │  - Briefing Generation               │      │
-│  │  - Rate Limiting                     │      │
-│  └──────────────────────────────────────┘      │
-└─────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│  DigitalOcean Server (poosdproj.xyz → 129.212.183.227:3001) │
+│  ┌────────────────────────────────────────────┐             │
+│  │  Express.js API (PM2)                      │             │
+│  │  - Auth (password + OTP + JWT)             │             │
+│  │  - User & Preferences                      │             │
+│  │  - Briefing Pipeline (NewsAPI + GPT-4o)    │             │
+│  │  - Rate Limiting & Quotas                  │             │
+│  └────────────────────────────────────────────┘             │
+└────────────────────────────────────────────────────────────┘
          │
          ↓
 ┌─────────────────────────────────────────────────┐
@@ -56,20 +55,18 @@ Technical architecture overview for the Personalized News Briefing application.
 ### Backend
 
 - **Runtime:** Node.js 20
-- **Framework:** Express.js 4
-- **Language:** TypeScript 5
-- **Database:** MongoDB with Mongoose ODM
-- **Authentication:** JWT (jsonwebtoken)
-- **Security:** Helmet, CORS, bcrypt
-- **Rate Limiting:** express-rate-limit
-- **Process Manager:** PM2
+- **Framework:** Express.js 4 + TypeScript 5
+- **Database:** MongoDB Atlas via Mongoose
+- **Authentication:** bcrypt, JWT (jsonwebtoken), Nodemailer SMTP
+- **Security:** Helmet, CORS, request IDs, centralized error handling
+- **Rate Limiting:** express-rate-limit (`userRateLimit` active; `ipRateLimit` optional)
+- **Process Manager:** PM2 (managed by GitHub Actions deploy)
 
-### Future Additions
+### Frontends
 
-- **Frontend:** Next.js + Tailwind CSS
-- **AI:** OpenAI GPT-4
-- **News:** News API or similar
-- **Email:** Resend or SendGrid
+- **Web:** React 19 + Vite + React Testing Library (prototype dashboard/onboarding)
+- **Mobile:** Flutter (iOS + Android) w/ Provider + flutter_secure_storage
+- **Shared Contracts:** `packages/contracts` (Zod schemas exported as TS types)
 
 ---
 
@@ -175,8 +172,8 @@ Middleware Stack:
 ├── requestId (add unique ID)
 ├── helmet (security headers)
 ├── cors (cross-origin)
-├── morgan (logging)
-├── ipRateLimit (rate limiting)
+├── morgan (logging with request IDs)
+├── ipRateLimit (optional; disabled in development)
     ↓
 Route Handler:
 ├── authenticateToken (JWT verification)
@@ -197,14 +194,15 @@ Client Response
 
 **Security:**
 
-- `helmet` - Security headers
-- `cors` - Cross-origin resource sharing
+- `helmet` - Security headers (CSP disabled so the bundled frontend can mount)
+- `cors` - Uses `FRONTEND_URL` in development; production allow list is currently hard-coded to `http://129.212.183.227:3001` and `http://localhost:3000`
 - `authenticateToken` - JWT verification
 
-**Rate Limiting:**
+**Rate Limiting & Quotas:**
 
-- `ipRateLimit` - 100 requests/15min per IP
-- `userRateLimit` - 200 requests/15min per user
+- `userRateLimit` – 200 requests / 15 minutes per authenticated user
+- `ipRateLimit` – optional 100 requests / 15 minutes per IP (disabled today)
+- `tryConsumeDailyGenerate` – DAO helper invoked before briefing generation to enforce daily caps
 
 **Utilities:**
 
@@ -217,27 +215,13 @@ Client Response
 ## Authentication Flow
 
 ```
-1. User requests OTP
-   POST /api/auth/otp/request
-   └─→ Generate random 6-digit code
-   └─→ Hash with bcrypt
-   └─→ Store in user.otp (10min expiration)
-   └─→ Log code to console (no email yet)
-
-2. User verifies OTP
-   POST /api/auth/otp/verify
-   └─→ Verify code with bcrypt
-   └─→ Mark email as verified
-   └─→ Generate JWT token (7 day expiration)
-   └─→ Return token + user data
-
-3. User makes authenticated requests
-   Any protected route
-   └─→ Extract Bearer token from header
-   └─→ Verify JWT signature
-   └─→ Load user from database
-   └─→ Attach user to req.user
-   └─→ Continue to route handler
+1. Client optionally calls /api/auth/check-user to decide if a password prompt is needed.
+2. Registration or login POST (with optional password + onboarding data).
+   └─→ AuthService hashes passwords, stores preferences, and issues a 6-digit OTP (bcrypt hashed with 10‑minute TTL + 5 attempts).
+   └─→ EmailService uses Nodemailer + SMTP credentials to send the OTP (console logs only show the code when sending fails).
+3. Client submits the OTP to /api/auth/verify (or /api/auth/otp/verify for legacy flows).
+   └─→ Service validates TTL/attempts, marks the email verified, and creates a 7‑day JWT.
+4. Protected routes read `Authorization: Bearer <token>`, verify the signature, attach `req.user`, and pass through business logic.
 ```
 
 ---
@@ -245,31 +229,26 @@ Client Response
 ## Briefing Generation Flow
 
 ```
-1. User requests briefing
-   POST /api/briefings/generate
-   └─→ Check daily quota
-   └─→ Create briefing doc (status: "queued")
-   └─→ Return briefing ID
-   └─→ Increment user quota
+1. User submits POST /api/briefings/generate (custom) or /generate-daily
+   └─→ userRateLimit + quota check
+   └─→ Briefing document persisted with status "queued"
 
-2. Background processing (setTimeout)
-   └─→ Wait 3 seconds
-   └─→ Generate stub data:
-       ├── Dummy articles
-       ├── Stub summary
-       └── LLM metadata
-   └─→ Update status to "done"
+2. Background worker (setTimeout) processes the job
+   └─→ Status → "fetching"
+   └─→ NewsService hits NewsAPI using topic/source filters (respects historical window limits)
+   └─→ ArticleScraper retrieves full text for up to 3 articles that clear quality thresholds
 
-3. Client polls for completion
-   GET /api/briefings/:id/status
-   └─→ Return current status
+3. Summarization
+   └─→ Status → "summarizing"
+   └─→ BriefingService builds persona-aware prompt + citations
+   └─→ OpenAI GPT-4o chat completion returns structured summary + usage stats
 
-4. Client retrieves briefing
-   GET /api/briefings/:id
-   └─→ Return full briefing with articles & summary
+4. Completion
+   └─→ Status → "done" (or "error" with message)
+   └─→ Clients poll `/status` then fetch `/api/briefings/:id`
 ```
 
-**Note:** Steps 2 will be replaced with real news fetching and OpenAI summarization.
+> ⚠️ Jobs currently run inside the API process. Restarting the server mid-job will drop in-flight work; migrating to a queue is on the roadmap.
 
 ---
 
@@ -278,28 +257,26 @@ Client Response
 ### GitHub Actions Workflow
 
 ```
-Push to main branch
-    ↓
-GitHub Actions Runner:
-├── 1. Checkout code
-├── 2. Setup Node.js 20
-├── 3. Install dependencies
-├── 4. Build TypeScript
-    ↓
-SSH to DigitalOcean Server:
-├── 5. Pull latest code
-├── 6. Install dependencies
-├── 7. Build on server
-├── 8. Restart PM2
-    ↓
-Deployment Complete
+Push to main
+  ↓
+GitHub Actions
+  ├─ Checkout repo
+  ├─ Setup Node.js 20
+  ├─ npm ci + build (packages/contracts)
+  ├─ npm ci + tsc (backend)
+  ├─ npm ci + vite build (frontend)
+  ├─ SCP backend/dist, frontend/dist, deploy scripts → /root/POOSD/POOSD-LargeProject_Team12/
+  └─ SSH + run backend/deploy-no-build.sh
+         ├─ npm ci --omit=dev
+         ├─ pm2 restart/start via ecosystem.config.js
+         └─ pm2 save
 ```
 
-**Secrets Required:**
+**Secrets Required**
 
-- `SERVER_HOST` - Server IP (129.212.183.227)
-- `SERVER_USER` - SSH username (root)
-- `SERVER_SSH_KEY` - Private SSH key
+- `SERVER_HOST` – `129.212.183.227`
+- `SERVER_USER` – `root`
+- `SERVER_SSH_KEY` – private key with access to the droplet
 
 ---
 
@@ -331,18 +308,18 @@ All errors follow consistent format:
 
 ## Security Measures
 
-1. **Authentication:**
+1. **Authentication**
 
-   - OTP with bcrypt hashing
-   - JWT with secret signing
-   - 10-minute OTP expiration
-   - 5 attempt limit per OTP
+   - OTP codes hashed with bcrypt + 10-minute TTL + 5-attempt ceiling
+   - Optional password hashing (bcrypt) before OTP step
+   - JWT (HS256) with 7-day default expiration
+   - SMTP delivery via Nodemailer with graceful fallback logging
 
-2. **Rate Limiting:**
+2. **Rate Limiting & Quotas**
 
-   - Per-IP limits (100/15min)
-   - Per-user limits (200/15min)
-   - Daily briefing quota (3/day)
+   - `userRateLimit`: 200 requests / 15 min with standard rate-limit headers
+   - `ipRateLimit`: available but disabled in `app.ts` (enable for public launch)
+   - Daily quota: default 3 briefings/user/day enforced in MongoDB transaction helpers
 
 3. **Security Headers:**
 
@@ -350,10 +327,10 @@ All errors follow consistent format:
    - CORS configuration
    - Request ID tracking
 
-4. **Data Protection:**
-   - Hashed OTP codes
-   - No password storage (OTP-only auth)
-   - Environment variables for secrets
+4. **Data Protection**
+   - OTP/password hashes (bcrypt)
+   - Secrets stored via environment variables + GitHub secrets (no checked-in credentials)
+   - Request IDs + morgan logs for traceability
 
 ---
 
@@ -378,35 +355,38 @@ The `packages/contracts` directory contains shared TypeScript schemas using Zod:
 
 ## Future Architecture
 
-### News Integration
+### Job Queue & Workers
 
 ```
-User Request → Briefing Service → News API Service
-                                      ├── Query news API
-                                      ├── Fetch articles
-                                      ├── Extract full text
-                                      └── Return articles
+Client Request
+    ↓
+Express API ──→ Redis/BullMQ queue ──→ Worker Pods
+                                ├── Fetch NewsAPI data
+                                ├── Scrape articles in parallel
+                                ├── Call OpenAI (retry/backoff)
+                                └── Update MongoDB with status + summary
 ```
 
-### AI Summarization
+- Survives process restarts, supports concurrency limits, and keeps long-running work outside the web tier.
+
+### Notifications & Delivery
 
 ```
-Articles → LLM Service → OpenAI API
-                         ├── Build prompt
-                         ├── Send to GPT-4
-                         ├── Parse response
-                         └── Return summary
+Briefing Completed
+    ↓
+Event Bus
+    ├── Email service (production SMTP or provider)
+    ├── Push notification service (FCM/APNS)
+    └── WebSocket/SSE gateway for React dashboard
 ```
 
-### Frontend
+- Pushes "briefing ready" events to users instead of polling every few seconds.
 
-```
-Next.js App → REST API
-├── Authentication pages
-├── Dashboard
-├── Briefing viewer
-└── Settings
-```
+### Frontend Evolution
+
+- Continue hardening the React + Vite dashboard (sharing, saved briefings, admin insights).
+- Flutter app adds offline Briefing cache + push notification handling.
+- Potential future Next.js shell once requirements for SEO/public marketing pages emerge.
 
 ---
 

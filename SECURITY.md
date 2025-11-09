@@ -39,22 +39,20 @@ nano .env  # Edit with your credentials
 
 ### Required Secrets
 
-**Development:**
+**Development & Production:**
 
-- `MONGODB_URI` - Database connection
-- `JWT_SECRET` - Token signing key
+- `MONGODB_URI` – Database connection
+- `JWT_SECRET` – Token signing key (generate with `openssl rand -base64 64`)
+- `NEWS_API_KEY` – Needed at boot; NewsService will throw without it
+- `OPENAI_API_KEY` – Required for GPT-4o summaries
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `VERIFIED_DOMAIN` – Nodemailer config for OTP emails
+- `FRONTEND_URL` – Trusted origin for CORS
 
-**Production (additional):**
+**Additional production concerns:**
 
-- Strong `JWT_SECRET` (64+ character random string)
-- MongoDB Atlas with IP whitelisting
-- Strong database password
-
-**Future:**
-
-- `OPENAI_API_KEY`
-- `NEWS_API_KEY`
-- `RESEND_API_KEY`
+- MongoDB Atlas IP allow list must include the droplet IP
+- Strong database user/password with least privilege
+- GitHub Actions secrets: `SERVER_HOST`, `SERVER_USER`, `SERVER_SSH_KEY`
 
 ---
 
@@ -64,11 +62,10 @@ nano .env  # Edit with your credentials
 
 **Current implementation:**
 
-- 6-digit random codes
-- Bcrypt hashing (10 rounds)
-- 10-minute expiration
-- Maximum 5 attempts
-- Rate limiting per IP
+- 6-digit random codes hashed with bcrypt (10 rounds)
+- 10-minute expiration window
+- Maximum 5 attempts per issued code
+- Per-user rate limiting (200 requests / 15 min) with optional per-IP throttling when enabled
 
 **Best practices:**
 
@@ -103,17 +100,14 @@ openssl rand -base64 64
 
 **Current limits:**
 
-- Per-IP: 100 requests / 15 minutes
-- Per-User: 200 requests / 15 minutes
-- Briefing generation: 3 / day
+- Per-user: 200 requests / 15 minutes (`userRateLimit`)
+- Per-IP: 100 requests / 15 minutes (`ipRateLimit`) – middleware exists but is disabled in `src/app.ts`
+- Briefing generation: default 3 per user per day (stored on the user document)
 
-**Customize in `.env`:**
+**Configuration:**
 
-```bash
-RATE_LIMIT_WINDOW_MS=900000     # 15 minutes
-RATE_LIMIT_MAX_REQUESTS=100
-DAILY_QUOTA_LIMIT=3
-```
+- `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` currently apply only to the optional IP limiter.
+- Daily caps are set when the user is created (`limits.dailyGenerateCap`); adjust via a migration or admin tool.
 
 ---
 
@@ -128,8 +122,8 @@ Implemented via Helmet middleware:
 
 **CORS configured for:**
 
-- Development: `http://localhost:3000`
-- Production: Configure `FRONTEND_URL` in `.env`
+- Development: `FRONTEND_URL` (defaults to `http://localhost:3000`)
+- Production: Hard-coded to `["http://129.212.183.227:3001", "http://localhost:3000"]` in `src/app.ts` until a configurable allow list is added
 
 ---
 

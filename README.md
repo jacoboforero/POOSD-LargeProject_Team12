@@ -1,14 +1,16 @@
 # Personalized News Briefing App
 
-A web application that generates personalized news briefings based on user preferences.
+A full-stack platform (web, mobile, API) that assembles personalized news briefings with live News API data, OpenAI summarization, and email-based OTP authentication.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js 20+
-- MongoDB Atlas account
-- GitHub account (for deployment)
+- MongoDB Atlas database + IP allow list
+- NewsAPI.org key
+- OpenAI API key
+- SMTP credentials (Gmail, Mailtrap, Outlook, etc.)
 
 ### Local Development
 
@@ -17,141 +19,146 @@ A web application that generates personalized news briefings based on user prefe
 git clone <repo-url>
 cd POOSD-LargeProject_Team12
 
-# Setup backend
+# Backend setup
 cd backend
 npm install
-cp .env.example .env
-# Edit .env with your credentials
-
-# Run backend
-npm run dev
+cp .env.example .env   # fill in MongoDB, JWT, NEWS_API_KEY, OPENAI_API_KEY, SMTP_*
+npm run dev            # starts Express on PORT (default 3002 via .env)
 ```
 
-Backend runs at `http://localhost:3002` (local dev)
+Backend health: `GET http://localhost:3002/health`
 
-**Note:** Production server uses port 3001 at `http://129.212.183.227:3001`
+Optional frontends:
 
-### Test the API
+```bash
+# Web (React + Vite)
+cd ../frontend
+npm install
+npm run dev            # http://localhost:3000, proxies /api to http://localhost:3001 by default
+# Update `PORT` or `vite.config.ts` if your backend listens on a different port
+
+# Flutter mobile
+cd ../frontend_mobile
+flutter pub get
+flutter run            # defaults to https://poosdproj.xyz; use --dart-define API_BASE_URL=http://10.0.2.2:3002 for a local backend
+```
+
+**Production:** `https://poosdproj.xyz` (reverse proxy to the DigitalOcean droplet at `129.212.183.227:3001`)
+
+### Smoke Tests
 
 ```bash
 # Health check
 curl http://localhost:3002/health
 
-# Register new user
+# Register and send OTP email
 curl -X POST http://localhost:3002/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com"}'
+  -d '{"email":"test@example.com","name":"Test User","topics":["technology"],"password":"StrongPass!9"}'
 
-# Check server logs for OTP code, then verify
+# Verify OTP (code arrives via configured SMTP)
 curl -X POST http://localhost:3002/api/auth/verify \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com", "code": "YOUR_OTP"}'
+  -d '{"email":"test@example.com","code":"123456"}'
 
-# Login existing user (returns new OTP)
-curl -X POST http://localhost:3002/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com"}'
+# Authenticated request
+curl http://localhost:3002/api/me \
+  -H "Authorization: Bearer YOUR_JWT"
 ```
 
 ## 📚 Documentation
 
-- **[API Documentation](backend/API_DOCUMENTATION.md)** - Complete API reference
-- **[Backend Setup](backend/README.md)** - Backend development guide
-- **[Deployment Guide](DEPLOYMENT.md)** - Production deployment with GitHub Actions
-- **[Architecture](docs/Architecture.md)** - System architecture overview
-- **[Security](SECURITY.md)** - Security guidelines
+- **[API Documentation](backend/API_DOCUMENTATION.md)** – Endpoints, payloads, and flows
+- **[Backend Setup](backend/README.md)** – Scripts, environment, and troubleshooting
+- **[Deployment Guide](DEPLOYMENT.md)** – CI/CD pipeline and server setup
+- **[Architecture](docs/Architecture.md)** – System and data-flow overview
+- **[Security](SECURITY.md)** – Credential handling and hardening checklist
+- **[Email Setup](EMAIL_SETUP.md)** – SMTP configuration guide
+- **[Testing Plan](docs/TESTING.md)** – Current automated coverage
 
 ## 🏗️ Tech Stack
 
-- **Backend:** Express.js (TypeScript) + MongoDB
-- **Authentication:** JWT with OTP via email
-- **Deployment:** GitHub Actions → DigitalOcean Droplet
-- **Future:** Next.js frontend, OpenAI integration, News APIs
+- **Backend:** Express.js (TypeScript), Mongoose, Nodemailer, Axios, OpenAI SDK
+- **Data:** MongoDB Atlas
+- **Authentication:** Password + OTP, JWT (HS256), bcrypt hashing
+- **News Intake:** NewsAPI.org + custom scraper for full-text extraction
+- **Summaries:** OpenAI GPT-4o
+- **Frontend:** React 19 + Vite
+- **Mobile:** Flutter (iOS + Android)
+- **Deployment:** GitHub Actions → SCP artifacts → PM2 on DigitalOcean
 
 ## 📁 Project Structure
 
 ```
-backend/
-├── src/
-│   ├── routes/        # API routes
-│   ├── services/      # Business logic
-│   ├── models/        # MongoDB models
-│   ├── middleware/    # Auth, rate limiting, errors
-│   └── utils/         # JWT utilities
-└── dist/              # Compiled JavaScript
-
-packages/
-└── contracts/         # Shared TypeScript schemas
-
-.github/workflows/     # CI/CD pipelines
+backend/             # Express API (TypeScript)
+frontend/            # React + Vite prototype portal
+frontend_mobile/     # Flutter client (iOS/Android)
+packages/contracts/  # Shared Zod schemas & TS types
+docs/                # Architecture, testing, etc.
+.github/workflows/   # CI/CD pipelines
+scripts/             # Server bootstrap helpers
 ```
 
 ## 🔧 Current Status
 
-**✅ Implemented:**
+**✅ Implemented**
 
-- OTP-based authentication with JWT
-- User management and preferences
-- Briefing generation API (with dummy data)
-- MongoDB integration
-- Rate limiting and security middleware
-- Automated deployment pipeline
+- Email-based OTP auth with optional password gate
+- JWT session issuance and user preference management
+- NewsAPI + scraper ingestion feeding GPT-4o summaries
+- Briefing quota tracking and per-user rate limiting
+- Automated deployment that ships built frontend + backend bundles
+- React + Flutter clients consuming the same API contracts
 
-**🚧 In Progress:**
+**🚧 In Progress**
 
-- News API integration
-- OpenAI summarization
-- Email service (OTPs currently log to console)
-- Next.js frontend
+- Dedicated job queue (BullMQ/Redis) instead of in-process timers
+- Production-grade push notifications & email templates
+- Expanded frontend dashboard and sharing workflows
 
-## 📝 Environment Variables
+## 📝 Environment Variables (backend)
 
-Required for backend (see `backend/.env.example`):
+| Key | Purpose |
+| --- | --- |
+| `PORT` | API port (defaults to 4000 if unset; `.env.example` pins 3002) |
+| `NODE_ENV` | `development` or `production` |
+| `MONGODB_URI` | MongoDB Atlas connection string |
+| `JWT_SECRET` / `JWT_EXPIRES_IN` | JWT signing + expiration |
+| `FRONTEND_URL` | Allowed origin for CORS (e.g. `http://localhost:3000`) |
+| `NEWS_API_KEY` | Required – News API queries fail without it |
+| `OPENAI_API_KEY` | Required – GPT-4o summarization |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_SECURE` / `SMTP_USER` / `SMTP_PASS` | Required – OTP delivery |
+| `VERIFIED_DOMAIN` | Used in email `from` address |
+| `RATE_LIMIT_WINDOW_MS`, `RATE_LIMIT_MAX_REQUESTS` | Reserved for the optional IP rate limiter (user limiter uses built-in defaults) |
+| `DAILY_QUOTA_LIMIT` | Placeholder for future runtime configuration; user docs currently store `limits.dailyGenerateCap` (default 3) |
 
-- `MONGODB_URI` - MongoDB connection string
-- `JWT_SECRET` - Secret for JWT signing
-- `PORT` - Server port (default: 3002 for local dev, 3001 for production)
-
-Future integration:
-
-- `OPENAI_API_KEY` - For summarization
-- `NEWS_API_KEY` - For news articles
-- `RESEND_API_KEY` - For email OTPs
+See `backend/.env.example` for the full template.
 
 ## 🚀 Deployment
 
-Automated deployment via GitHub Actions:
+`main` branch pushes trigger GitHub Actions:
 
-1. Push to `main` branch
-2. GitHub Actions builds and tests
-3. Deploys to DigitalOcean server via SSH
-4. PM2 restarts the application
+1. Install + build `packages/contracts`, backend, and frontend.
+2. SCP the compiled artifacts (`backend/dist`, `frontend/dist`, scripts, package manifests) to `/root/POOSD/POOSD-LargeProject_Team12/`.
+3. Run `backend/deploy-no-build.sh` on the droplet:
+   - `npm ci --omit=dev`
+   - Start/restart PM2 via `ecosystem.config.js`
+4. Serve the React build as static assets behind the Express API (`poosdproj.xyz`).
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for setup instructions.
+Manual steps and server bootstrap instructions live in [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## 🆘 Troubleshooting
 
-**Server won't start:**
-
-- Check MongoDB connection string in `.env`
-- Ensure Node.js 20+ is installed
-- Run `npm install` in backend directory
-
-**Authentication fails:**
-
-- OTPs are logged to server console (check logs)
-- OTPs expire after 10 minutes
-- Maximum 5 attempts per OTP
-
-**API returns 404:**
-
-- Verify server is running: `curl http://localhost:3002/health` (local)
-- Check correct port (3002 for local dev, 3001 for production)
+- **Server fails immediately:** Ensure `MONGODB_URI`, `NEWS_API_KEY`, `OPENAI_API_KEY`, and SMTP vars are set. Missing News/OpenAI keys prevent the Briefing service from instantiating.
+- **OTP email missing:** Double-check SMTP credentials; logs fall back to printing the OTP if email delivery fails.
+- **CORS errors:** Set `FRONTEND_URL` to the exact origin of your local frontend (`http://localhost:3000` for the Vite dev server).
+- **Briefing errors:** Rate limit is 3 per day by default; look for status `error` with message about News API windows or missing content.
+- **Health check fails in prod:** Hit `https://poosdproj.xyz/health` to confirm the droplet is reachable; confirm PM2 status with `pm2 logs news-briefing-api`.
 
 ## 👥 Team
 
-POOSD Large Project - Team 12
+POOSD Large Project – Team 12
 
 ## 📄 License
 
-Educational project for Principles of Object-Oriented Software Design course.
+Educational project for the Principles of Object-Oriented Software Design course.

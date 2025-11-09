@@ -19,6 +19,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your-app-password
+VERIFIED_DOMAIN=poosdproj.xyz   # used in the "from" address
 ```
 
 ### 2. Gmail Setup (Recommended)
@@ -34,12 +35,13 @@ If using Gmail:
 
 3. **Update .env**:
    ```env
-   SMTP_HOST=smtp.gmail.com
-   SMTP_PORT=587
-   SMTP_SECURE=false
-   SMTP_USER=your-gmail@gmail.com
-   SMTP_PASS=your-16-char-app-password
-   ```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your-gmail@gmail.com
+SMTP_PASS=your-16-char-app-password
+VERIFIED_DOMAIN=yourdomain.com
+```
 
 ### 3. Other Email Providers
 
@@ -50,6 +52,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your-email@outlook.com
 SMTP_PASS=your-password
+VERIFIED_DOMAIN=yourdomain.com
 ```
 
 #### Yahoo
@@ -59,6 +62,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your-email@yahoo.com
 SMTP_PASS=your-app-password
+VERIFIED_DOMAIN=yourdomain.com
 ```
 
 #### Custom SMTP Server
@@ -68,6 +72,7 @@ SMTP_PORT=587
 SMTP_SECURE=false
 SMTP_USER=your-username
 SMTP_PASS=your-password
+VERIFIED_DOMAIN=yourdomain.com
 ```
 
 ## Email Templates

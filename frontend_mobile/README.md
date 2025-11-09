@@ -41,17 +41,15 @@ flutter pub get
 
 ### 3. Configure Backend URL
 
-Edit `lib/services/api_service.dart` and update the `baseUrl`:
+`ApiService` automatically picks a base URL:
 
-```dart
-// For local development
-static const String baseUrl = 'http://localhost:3001';  // iOS simulator
-// OR
-static const String baseUrl = 'http://10.0.2.2:3001';  // Android emulator
+- `flutter run --dart-define API_BASE_URL=http://192.168.x.x:3002` – Override for any environment.
+- Default dev targets:
+  - Android emulator → `http://10.0.2.2:3001`
+  - iOS simulator → `http://127.0.0.1:3001`
+- Release builds fall back to the hosted API: `https://poosdproj.xyz`
 
-// For production
-static const String baseUrl = 'http://129.212.183.227:3001';
-```
+If your backend runs on `3002` (the `.env.example` default), either set `PORT=3001` when starting the API **or** pass a matching `API_BASE_URL` via `--dart-define`.
 
 ### 4. Platform-Specific Setup
 
@@ -223,10 +221,12 @@ The mobile app requires the IntelliBrief backend to be running. See `../backend/
 ```bash
 cd ../backend
 npm install
+cp .env.example .env
+# Set PORT=3001 (to match the default mobile proxy) or update API_BASE_URL when running Flutter
 npm run dev
 ```
 
-Backend will run on: http://localhost:3001
+Default backend port is `3002` unless `PORT` is set. The mobile app expects `3001`, so either align the backend port or pass `--dart-define API_BASE_URL=http://10.0.2.2:3002`.
 
 ## Testing
 
@@ -261,12 +261,12 @@ Main dependencies (see `pubspec.yaml` for full list):
 
 1. **New User:**
    - Enter email → Detects "User not found"
-   - Navigate to onboarding → Answer 4 personalization questions
-   - Auto-login → OTP sent to backend console
+   - Navigate to onboarding → Answer personalization questions + optional password
+   - OTP sent via email (Mailtrap/Gmail/SMTP provider). Console logs include fallback only if email delivery fails.
    - Enter OTP → Authenticated → Landing page
 
 2. **Existing User:**
-   - Enter email → OTP sent to backend console
+   - Enter email (and password if prompted) → OTP emailed automatically
    - Enter OTP → Authenticated → Landing page
 
 3. **Generate Briefing:**

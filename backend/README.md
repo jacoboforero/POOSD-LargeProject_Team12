@@ -8,21 +8,21 @@ Express.js + TypeScript backend for personalized news briefings.
 # Install dependencies
 npm install
 
-# Setup environment
+# Setup environment (MongoDB, JWT, News API, OpenAI, SMTP, etc.)
 cp .env.example .env
-# Edit .env with your MongoDB URI and JWT secret
+nano .env
 
 # Development mode (with hot reload)
-npm run dev
+npm run dev   # respects PORT (defaults to 4000 if unset; template uses 3002)
 
 # Build for production
 npm run build
 
-# Start production server
+# Start production server from ./dist
 npm start
 ```
 
-Server runs on `http://localhost:3001`
+Health check: `GET http://localhost:${PORT}/health`
 
 ## Environment Variables
 
@@ -30,7 +30,7 @@ Create a `.env` file:
 
 ```bash
 # Required
-PORT=3001
+PORT=3002
 MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/news-briefing
 JWT_SECRET=your-secret-key-change-this
 
@@ -40,7 +40,19 @@ RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
 FRONTEND_URL=http://localhost:3000
 NODE_ENV=development
+
+# Required integrations
+NEWS_API_KEY=your-newsapi-key
+OPENAI_API_KEY=sk-...
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=you@example.com
+SMTP_PASS=app-password
+VERIFIED_DOMAIN=poosdproj.xyz
 ```
+
+> `RATE_LIMIT_WINDOW_MS` / `RATE_LIMIT_MAX_REQUESTS` are currently only consumed by the optional IP rate limiter (disabled in `app.ts`). User-level throttling (200 req / 15 min) and the default daily cap (3 briefings) are stored directly on each user document.
 
 ## Project Structure
 
@@ -146,35 +158,33 @@ export const ExampleModel = mongoose.model<IExample>("Example", ExampleSchema);
 
 ## Authentication
 
-- **OTP-based:** User requests OTP → receives code via console → verifies with code
-- **JWT tokens:** 7-day expiration (configurable)
-- **Protected routes:** Use `authenticateToken` middleware
-
-Example protected route:
-
-```typescript
-router.get("/protected", authenticateToken, async (req, res) => {
-  const userId = req.user._id;
-  res.json({ userId });
-});
-```
+- **Hybrid flow:** optional password check + mandatory OTP verification.
+- **Delivery:** OTP codes are emailed through configured SMTP (Mailtrap, Gmail, etc.). The server logs the OTP only if email delivery fails.
+- **Expiration:** codes are valid for 10 minutes with 5 attempts per request.
+- **JWT tokens:** 7-day expiration by default (configurable via `JWT_EXPIRES_IN`).
+- **Protected routes:** enforce `authenticateToken` (attaches `req.user`).
 
 ## Testing the API
 
-See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for complete endpoint reference.
-
-Quick test:
+See [API_DOCUMENTATION.md](./API_DOCUMENTATION.md) for a full reference.
 
 ```bash
-# Health check
-curl http://localhost:3001/health
+# Health
+curl http://localhost:3002/health
 
-# Request OTP
-curl -X POST http://localhost:3001/api/auth/otp/request \
+# Registration (sends OTP email)
+curl -X POST http://localhost:3002/api/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com"}'
+  -d '{"email":"test@example.com","name":"Test User","topics":["technology"],"password":"StrongPass!9"}'
 
-# Check server console for OTP code
+# OTP verification (code from email)
+curl -X POST http://localhost:3002/api/auth/verify \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","code":"123456"}'
+
+# Authenticated profile lookup
+curl http://localhost:3002/api/me \
+  -H "Authorization: Bearer YOUR_JWT"
 ```
 
 ## Database
@@ -215,27 +225,27 @@ Error handler returns consistent format:
 }
 ```
 
-## Rate Limiting
+## Rate Limiting & Quotas
 
-- Per-IP: 100 requests / 15 minutes
-- Per-User: 200 requests / 15 minutes
-- Daily briefing quota: 3 per user
+- **Per user:** `userRateLimit` middleware enforces 200 req / 15 min.
+- **Per IP:** `ipRateLimit` is available but disabled in `app.ts` for now; enable when ready.
+- **Daily quota:** `tryConsumeDailyGenerate` in `src/utils/dbUtils.ts` tracks 3 briefing generations per user per day (configurable via env).
 
 ## Current Status
 
 **✅ Working:**
 
-- OTP authentication with MongoDB
-- JWT token generation and verification
-- User management
-- Briefing generation (with stub data)
-- Rate limiting and security
+- Password + OTP authentication with MongoDB persistence
+- Email delivery via SMTP (registration, login, password reset)
+- NewsAPI ingestion + article scraping + GPT-4o summarization
+- User management, quotas, per-user rate limiting
+- Automated GH Actions deployment copying pre-built assets
 
 **🚧 TODO:**
 
-- Real news API integration
-- OpenAI summarization
-- Email service for OTPs
+- Move background processing to a queue (BullMQ/Redis)
+- Push notifications + richer email templates
+- Expanded admin instrumentation/logs
 
 ## Troubleshooting
 
@@ -249,10 +259,10 @@ Error handler returns consistent format:
 - Verify database user credentials
 - Check IP whitelist in MongoDB Atlas
 
-**"Port 3001 already in use"**
+**"Port already in use"**
 
 - Change `PORT` in `.env`
-- Or kill process: `lsof -ti:3001 | xargs kill`
+- Or kill the process: `lsof -ti:$PORT | xargs kill`
 
 ## Deployment
 

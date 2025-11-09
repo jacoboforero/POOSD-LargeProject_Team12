@@ -6,6 +6,7 @@ Automated deployment to DigitalOcean via GitHub Actions.
 
 - **Server:** DigitalOcean Droplet (Ubuntu)
 - **Server IP:** `129.212.183.227`
+- **Public URL:** `https://poosdproj.xyz` (reverse proxy to port `3001`)
 - **API Port:** `3001`
 - **Process Manager:** PM2
 - **CI/CD:** GitHub Actions
@@ -13,7 +14,7 @@ Automated deployment to DigitalOcean via GitHub Actions.
 ## Architecture
 
 ```
-GitHub Push → GitHub Actions → SSH to Server → Build → PM2 Restart
+GitHub Push → GitHub Actions (build backend+frontend) → SCP dist files → SSH → deploy-no-build.sh → PM2 restart
 ```
 
 Every push to `main` automatically deploys to production.
@@ -83,7 +84,17 @@ JWT_EXPIRES_IN=7d
 MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/news-briefing
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX_REQUESTS=100
+NEWS_API_KEY=your-newsapi-key
+OPENAI_API_KEY=sk-...
+SMTP_HOST=live.smtp.mailtrap.io
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=api
+SMTP_PASS=your-smtp-password
+VERIFIED_DOMAIN=poosdproj.xyz
 EOF
+
+> When `NODE_ENV=production`, `src/app.ts` currently hardcodes the CORS allowlist to `["http://129.212.183.227:3001", "http://localhost:3000"]`. Update that array if you plan to serve the frontend from a different origin.
 
 # Install dependencies and build
 npm install
@@ -99,7 +110,7 @@ pm2 startup
 
 ```bash
 # Health check
-curl http://129.212.183.227:3001/health
+curl https://poosdproj.xyz/health
 ```
 
 ---
@@ -171,11 +182,10 @@ jobs:
 
 2. GitHub Actions automatically:
 
-   - Builds the application
-   - SSHs to the server
-   - Pulls latest code
-   - Rebuilds on server
-   - Restarts PM2
+   - Installs dependencies for `packages/contracts`, `backend`, and `frontend`
+   - Builds backend TypeScript + frontend Vite bundle inside CI
+   - Copies the compiled assets plus deployment scripts to `/root/POOSD/POOSD-LargeProject_Team12/`
+   - SSHes in and runs `backend/deploy-no-build.sh` (npm ci --omit=dev + PM2 restart)
 
 3. Monitor deployment:
    - Go to **Actions** tab in GitHub
@@ -184,24 +194,23 @@ jobs:
 
 ### Manual Deployment
 
-If you need to deploy manually:
+If CI is unavailable you can redeploy by hand:
 
 ```bash
-# SSH to server
+# 1. Build locally
+cd backend && npm install && npm run build
+cd ../frontend && npm install && npm run build
+
+# 2. Copy artifacts to server
+scp -r backend/dist frontend/dist backend/package*.json backend/deploy-no-build.sh backend/ecosystem.config.js root@129.212.183.227:/root/POOSD/POOSD-LargeProject_Team12/
+
+# 3. SSH in and run the deploy script
 ssh root@129.212.183.227
-
-# Navigate to project
-cd /root/POOSD/POOSD-LargeProject_Team12
-
-# Pull latest changes
-git pull origin main
-
-# Build and restart
-cd backend
-npm install
-npm run build
-pm2 restart news-briefing-api
+cd /root/POOSD/POOSD-LargeProject_Team12/backend
+./deploy-no-build.sh
 ```
+
+> If you prefer the old “git pull + build on server” workflow, you can still run `npm ci && npm run build && pm2 restart news-briefing-api`, but be mindful of memory usage.
 
 ---
 
@@ -227,7 +236,7 @@ pm2 monit
 
 ```bash
 # From anywhere
-curl http://129.212.183.227:3001/health
+curl https://poosdproj.xyz/health
 ```
 
 Expected response:
@@ -235,7 +244,8 @@ Expected response:
 ```json
 {
   "status": "ok",
-  "version": "1.0.3",
+  "version": "1.0.4",
+  "message": "Deployment pipeline test - successful!",
   "environment": "production",
   "timestamp": "2025-10-23T12:00:00.000Z"
 }
@@ -307,8 +317,9 @@ pm2 logs news-briefing-api --lines 50
 
 # Common issues:
 # 1. MongoDB connection failed - check MONGODB_URI in .env
-# 2. Port already in use - check PORT in .env
-# 3. Missing environment variables - verify .env file
+# 2. Required API keys missing - ensure NEWS_API_KEY, OPENAI_API_KEY, and SMTP_* are set
+# 3. Port already in use - check PORT in .env
+# 4. Missing environment variables - verify .env file
 ```
 
 ### API Returns Errors
@@ -394,7 +405,7 @@ pm2 restart news-briefing-api
 
 Before deploying to production:
 
-- [ ] `.env` has production values (MongoDB URI, JWT secret)
+- [ ] `.env` has production values (MongoDB URI, JWT secret, NEWS_API_KEY, OPENAI_API_KEY, SMTP creds)
 - [ ] MongoDB Atlas IP whitelist includes server IP
 - [ ] GitHub Secrets are configured correctly
 - [ ] SSH key is properly set up
@@ -409,7 +420,7 @@ Before deploying to production:
 
 **API not responding:**
 
-- Check health: `curl http://129.212.183.227:3001/health`
+- Check health: `curl https://poosdproj.xyz/health`
 - Check PM2: `pm2 status`
 - Check logs: `pm2 logs`
 
